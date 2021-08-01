@@ -118,8 +118,12 @@ class LargeScaleClassifier(nn.Layer):
             # partial fc sample process
             total_label, self.index = paddle.class_center_sample(
                 total_label, self.num_local, self.num_sample)
-            # BEGIN TODO
-            self.sub_weight = Parameter(self.weight[index])
+            # TODO(GuoxiaWang)
+            sub_weight_tensor = self.weight[index]
+            self.sub_weight = paddle.create_parameter(
+                shape=sub_weight_tensor.shape,
+                dtype='float32',
+                default_initializer=paddle.nn.initializer.Assign(sub_weight_tensor))
             self.sub_weight_mom = self.weight_mom[index]
             optimizer._accumulators['velocity'].pop(optimizer._parameter_list[-1]['params'][0], None)
             optimizer._parameter_list[-1]['params'][0] = self.sub_weight
