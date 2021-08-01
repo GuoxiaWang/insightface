@@ -121,9 +121,9 @@ class LargeScaleClassifier(nn.Layer):
             # BEGIN TODO
             self.sub_weight = Parameter(self.weight[index])
             self.sub_weight_mom = self.weight_mom[index]
-            optimizer.state.pop(optimizer.param_groups[-1]['params'][0], None)
-            optimizer.param_groups[-1]['params'][0] = self.sub_weight
-            optimizer.state[self.sub_weight]['momentum_buffer'] = self.sub_weight_mom
+            optimizer._accumulators['velocity'].pop(optimizer._parameter_list[-1]['params'][0], None)
+            optimizer._parameter_list[-1]['params'][0] = self.sub_weight
+            optimizer._accumulators['velocity'][self.sub_weight.name] = self.sub_weight_mom
             # END TODO
             return total_label
 
