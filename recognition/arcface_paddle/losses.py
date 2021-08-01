@@ -17,29 +17,26 @@ from paddle import nn
 
 
 class CosFace(nn.Layer):
-    def __init__(self, s=64.0, m=0.40):
+    def __init__(self, m1=1.0, m2=0.0, m3=0.35, s=64.0):
         super(CosFace, self).__init__()
-        self.s = s
-        self.m = m
-
-    def forward(self, cosine, label):
-        m_hot = paddle.nn.functional.one_hot(
-            label.astype('long'), num_classes=85742) * self.m
-        cosine -= m_hot
-        ret = cosine * self.s
-        return ret
-
+        self.margin1 = m1
+        self.margin2 = m2
+        self.margin3 = m3
+        self.scale = s
 
 class ArcFace(nn.Layer):
-    def __init__(self, s=64.0, m=0.50):
+    def __init__(self, m1=1.0, m2=0.5, m3=0.0, s=64.0):
         super(ArcFace, self).__init__()
-        self.s = s
-        self.m = m
+        self.margin1 = m1
+        self.margin2 = m2
+        self.margin3 = m3
+        self.scale = s
 
-    def forward(self, cosine: paddle.Tensor, label):
-        m_hot = paddle.nn.functional.one_hot(
-            label.astype('long'), num_classes=85742) * self.m
-        cosine = cosine.acos()
-        cosine += m_hot
-        cosine = cosine.cos() * self.s
-        return cosine
+class SphereFace(nn.Layer):
+    def __init__(self, m1=1.35, m2=0.0, m3=0.0, s=64.0):
+        super(SphereFace, self).__init__()
+        self.margin1 = m1
+        self.margin2 = m2
+        self.margin3 = m3
+        self.scale = s
+

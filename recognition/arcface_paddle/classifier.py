@@ -19,7 +19,7 @@ from paddle.nn.functional import normalize, linear
 import pickle
 
 
-class PartialFC(nn.Layer):
+class LargeScaleClassifier(nn.Layer):
     """
     Author: {Xiang An, Yang Xiao, XuHan Zhu} in DeepGlint,
     Partial FC: Training 10 Million Identities on a Single Machine
@@ -33,7 +33,10 @@ class PartialFC(nn.Layer):
                  world_size,
                  batch_size,
                  resume,
-                 margin_softmax,
+                 margin1=1.0,
+                 margin2=0.5,
+                 margin3=0.0,
+                 scale=64.0,
                  num_classes,
                  sample_rate=1.0,
                  embedding_size=512,
@@ -43,15 +46,17 @@ class PartialFC(nn.Layer):
         self.rank: int = rank
         self.world_size: int = world_size
         self.batch_size: int = batch_size
-        self.margin_softmax: callable = margin_softmax
         self.sample_rate: float = sample_rate
         self.embedding_size: int = embedding_size
         self.prefix: str = prefix
-        self.num_local: int = num_classes // world_size + int(
-            rank < num_classes % world_size)
-        self.class_start: int = num_classes // world_size * rank + min(
-            rank, num_classes % world_size)
+        self.num_local: int = (num_classes + world_size - 1) // world_size
+        if num_classes % world_size != 0 and rank == world_size - 1:
+            self.num_local = num_classes % self.num_local
         self.num_sample: int = int(self.sample_rate * self.num_local)
+        self.margin1 = margin1
+        self.margin2 = margin2
+        self.margin3 = margin3
+        self.scale = scale
 
         self.weight_name = os.path.join(
             self.prefix, "rank:{}_softmax_weight.pkl".format(self.rank))
@@ -103,66 +108,49 @@ class PartialFC(nn.Layer):
             pickle.dump(self.weight_mom.numpy(), file)
 
     @paddle.no_grad()
-    def sample(self, total_label):
-        index_positive = (self.class_start <= total_label).numpy() & (
-            total_label < self.class_start + self.num_local).numpy()
-        total_label = total_label.numpy()
-        total_label[~index_positive] = -1
-        total_label[index_positive] -= self.class_start
-        total_label = paddle.to_tensor(total_label)
-
-    def forward(self, total_features, norm_weight):
-        logits = linear(total_features, paddle.t(norm_weight))
-        return logits
+    def update(self):
+        self.weight[self.index] = self.sub_weight
+        self.weight_mom[self.index] = self.sub_weight_mom
 
     @paddle.no_grad()
-    def update(self):
-        self.weight_mom[self.index] = self.sub_weight_mom
-        self.weight[self.index] = self.sub_weight
+    def sample(self, total_label, optimizer):
+        if int(self.sample_rate) != 1:
+            # partial fc sample process
+            total_label, self.index = paddle.class_center_sample(
+                total_label, self.num_local, self.num_sample)
+            # BEGIN TODO
+            self.sub_weight = Parameter(self.weight[index])
+            self.sub_weight_mom = self.weight_mom[index]
+            optimizer.state.pop(optimizer.param_groups[-1]['params'][0], None)
+            optimizer.param_groups[-1]['params'][0] = self.sub_weight
+            optimizer.state[self.sub_weight]['momentum_buffer'] = self.sub_weight_mom
+            # END TODO
+            return total_label
 
-    def prepare(self, label, optimizer):
-        # label [64, 1]
-        total_label = label.detach()
-        self.sample(total_label)
-        optimizer._parameter_list[0] = self.sub_weight
+    def forward(self, feature, label, optimizer):
+        feature_list = []
+        paddle.distributed.all_gather(feature_list, features)
+        total_feature = paddle.concat(feature_list, axis=0)
+
+        label_list = []
+        paddle.distributed.all_gather(label_list, label)
+        total_label = paddle.concat(label_list, axis=0)
+        total_label.stop_gradient = True
+
+        total_label = self.sample(total_label, optimizer)
+
+        norm_feature = normalize(total_feature)
         norm_weight = normalize(self.sub_weight)
-        return total_label, norm_weight
+        logits = linear(norm_feature, paddle.t(norm_weight))
 
-    def forward_backward(self, label, features, optimizer):
-        total_label, norm_weight = self.prepare(label, optimizer)
-        total_features = features.detach()
-        total_features.stop_gradient = False
+        loss_v = paddle.nn.functional.margin_softmax_with_cross_entropy(
+            logits,
+            total_label,
+            margin1=self.margin1,
+            margin2=self.margin2,
+            margin3=self.margin3,
+            scale=self.logit_scale,
+            return_softmax=False)
+        return loss_v
 
-        logits = self.forward(total_features, norm_weight)
-        logits = self.margin_softmax(logits, total_label)
 
-        with paddle.no_grad():
-            max_fc = paddle.max(logits, axis=1, keepdim=True)
-
-            # calculate exp(logits) and all-reduce
-            logits_exp = paddle.exp(logits - max_fc)
-            logits_sum_exp = logits_exp.sum(axis=1, keepdim=True)
-
-            # calculate prob
-            logits_exp = logits_exp.divide(logits_sum_exp)
-
-            # get one-hot
-            grad = logits_exp
-            one_hot = paddle.nn.functional.one_hot(
-                total_label.astype('long'), num_classes=85742)
-
-            # calculate loss
-            loss = paddle.nn.functional.one_hot(
-                total_label.astype('long'),
-                num_classes=85742).multiply(grad).sum(axis=1)
-            loss_v = paddle.clip(loss, 1e-30).log().mean() * (-1)
-
-            # calculate grad
-            grad -= one_hot
-            grad = grad.divide(
-                paddle.to_tensor(
-                    self.batch_size * self.world_size, dtype='float32'))
-        (logits.multiply(grad)).backward()
-
-        x_grad = paddle.to_tensor(total_features.grad, stop_gradient=False)
-        return x_grad, loss_v

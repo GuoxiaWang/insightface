@@ -16,10 +16,9 @@ from dataloader import CommonDataset
 
 from paddle.io import DataLoader
 from config import config as cfg
-from partial_fc import PartialFC
+from classifier import LargeScaleClassifier
 from utils.utils_callbacks import CallBackVerification, CallBackLogging, CallBackModelCheckpoint
 from utils.utils_logging import AverageMeter
-import paddle.nn.functional as F
 from paddle.nn import ClipGradByNorm
 from visualdl import LogWriter
 import paddle
@@ -30,10 +29,26 @@ import time
 import os
 import sys
 
+RELATED_FLAGS_SETTING = {
+    'FLAGS_cudnn_exhaustive_search': 1,
+    'FLAGS_cudnn_batchnorm_spatial_persistent': 1,
+    'FLAGS_max_inplace_grad_add': 8,
+}
+paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
 def main(args):
-    world_size = int(1.0)
-    rank = int(0.0)
+
+
+    world_size = int(os.getenv("PADDLE_TRAINERS_NUM", 1))
+    rank = int(os.getenv("PADDLE_TRAINER_ID", 0))
+
+    gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
+    place = paddle.CUDAPlace(gpu_id)
+
+    if world_size > 1:
+        strategy = fleet.DistributedStrategy()
+        strategy.without_graph_optimization = True
+        fleet.init(is_collective=True, strategy=strategy)
 
     if not os.path.exists(args.output):
         os.makedirs(args.output)
@@ -45,6 +60,7 @@ def main(args):
     train_loader = DataLoader(
         dataset=trainset,
         batch_size=args.batch_size,
+        places=place,
         shuffle=True,
         drop_last=True,
         num_workers=0)
@@ -53,48 +69,39 @@ def main(args):
     backbone.train()
 
     clip_by_norm = ClipGradByNorm(5.0)
-    margin_softmax = eval("losses.{}".format(args.loss))()
+    margin_loss_params = eval("losses.{}".format(args.loss))()
 
-    module_partial_fc = PartialFC(
+    large_scale_classifier = LargeScaleClassifier(
         rank=0,
         world_size=1,
         resume=0,
         batch_size=args.batch_size,
-        margin_softmax=margin_softmax,
+        margin1=margin_loss_params.margin1,
+        margin2=margin_loss_params.margin2,
+        margin3=margin_loss_params.margin3,
+        scale=margin_loss_params.scale,
         num_classes=cfg.num_classes,
         sample_rate=cfg.sample_rate,
         embedding_size=args.embedding_size,
         prefix=args.output)
 
-    scheduler_backbone_decay = paddle.optimizer.lr.LambdaDecay(
+    lr_scheduler_decay = paddle.optimizer.lr.LambdaDecay(
         learning_rate=args.lr, lr_lambda=cfg.lr_func, verbose=True)
-    scheduler_backbone = paddle.optimizer.lr.LinearWarmup(
-        learning_rate=scheduler_backbone_decay,
+    lr_scheduler = paddle.optimizer.lr.LinearWarmup(
+        learning_rate=lr_scheduler_decay,
         warmup_steps=cfg.warmup_epoch,
         start_lr=0,
         end_lr=args.lr / 512 * args.batch_size,
         verbose=True)
-    opt_backbone = paddle.optimizer.Momentum(
-        parameters=backbone.parameters(),
-        learning_rate=scheduler_backbone,
+    optimizer = paddle.optimizer.Momentum(
+        parameters=[backbone.parameters(), large_scale_classifier.parameters()],
+        learning_rate=lr_scheduler,
         momentum=0.9,
         weight_decay=args.weight_decay,
         grad_clip=clip_by_norm)
 
-    scheduler_pfc_decay = paddle.optimizer.lr.LambdaDecay(
-        learning_rate=args.lr, lr_lambda=cfg.lr_func, verbose=True)
-    scheduler_pfc = paddle.optimizer.lr.LinearWarmup(
-        learning_rate=scheduler_pfc_decay,
-        warmup_steps=cfg.warmup_epoch,
-        start_lr=0,
-        end_lr=args.lr / 512 * args.batch_size,
-        verbose=True)
-    opt_pfc = paddle.optimizer.Momentum(
-        parameters=module_partial_fc.parameters(),
-        learning_rate=scheduler_pfc,
-        momentum=0.9,
-        weight_decay=args.weight_decay,
-        grad_clip=clip_by_norm)
+    if world_size > 1:
+        optimizer = fleet.distributed_optimizer(optimizer)
 
     start_epoch = 0
     total_step = int(
@@ -116,30 +123,20 @@ def main(args):
             label = label.flatten()
             global_step += 1
             sys.stdout.flush()
-            features = F.normalize(backbone(img))
-            x_grad, loss_v = module_partial_fc.forward_backward(
-                label, features, opt_pfc)
-            sys.stdout.flush()
-            (features.multiply(x_grad)).backward()
-            sys.stdout.flush()
-            opt_backbone.step()
-            opt_pfc.step()
-            module_partial_fc.update()
-            opt_backbone.clear_gradients()
-            opt_pfc.clear_gradients()
-            sys.stdout.flush()
+            features = backbone(img)
+            loss_v = large_scale_classifier(features, label, optimizer)
+            loss_v.backward()
+            optimizer.step()
+            optimizer.clear_grad()
 
-            lr_backbone_value = opt_backbone._global_learning_rate().numpy()[0]
-            lr_pfc_value = opt_backbone._global_learning_rate().numpy()[0]
+            large_scale_classifier.update()
 
+            lr_value = optimizer._global_learning_rate().numpy()[0]
             loss.update(loss_v, 1)
-            callback_logging(global_step, loss, epoch, lr_backbone_value,
-                             lr_pfc_value)
-            sys.stdout.flush()
+            callback_logging(global_step, loss, epoch, lr_value)
             callback_verification(global_step, backbone)
-        callback_checkpoint(global_step, backbone, module_partial_fc)
-        scheduler_backbone.step()
-        scheduler_pfc.step()
+        callback_checkpoint(global_step, backbone, large_scale_classifier)
+        lr_scheduler.step()
     writer.close()
 
 
