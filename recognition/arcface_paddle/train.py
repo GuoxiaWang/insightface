@@ -76,23 +76,39 @@ def main(args):
         world_size=1,
         resume=0,
         batch_size=args.batch_size,
+        num_classes=cfg.num_classes,
         margin1=margin_loss_params.margin1,
         margin2=margin_loss_params.margin2,
         margin3=margin_loss_params.margin3,
         scale=margin_loss_params.scale,
-        num_classes=cfg.num_classes,
         sample_rate=cfg.sample_rate,
         embedding_size=args.embedding_size,
         prefix=args.output)
+    large_scale_classifier.train()
 
-    lr_scheduler_decay = paddle.optimizer.lr.LambdaDecay(
-        learning_rate=args.lr, lr_lambda=cfg.lr_func, verbose=True)
+    num_image = len(trainset)
+    total_batch_size = args.batch_size * world_size
+    steps_per_epoch = num_image // total_batch_size
+    if cfg.train_unit == 'epoch':
+        warmup_steps = steps_per_epoch * cfg.warmup_num
+        total_steps = steps_per_epoch * cfg.train_num
+        decay_steps = [x * steps_per_epoch for x in cfg.decay_boundaries]
+        total_epoch = cfg.train_num
+    else:
+        warmup_steps = cfg.warmup_num
+        total_steps = cfg.train_num
+        decay_steps = [x for x in cfg.decay_boundaries]
+        total_epoch = (total_steps + steps_per_epoch - 1) // steps_per_epoch
+
+    base_lr = total_batch_size * args.lr / 512
     lr_scheduler = paddle.optimizer.lr.LinearWarmup(
-        learning_rate=lr_scheduler_decay,
-        warmup_steps=cfg.warmup_epoch,
-        start_lr=0,
-        end_lr=args.lr / 512 * args.batch_size,
-        verbose=True)
+        paddle.optimizer.lr.PiecewiseDecay(
+            boundaries=decay_steps,
+            values=[base_lr * (args.lr_decay**i) for i in range(len(decay_steps) + 1)]),
+        warmup_steps,
+        0,
+        base_lr)
+
     optimizer = paddle.optimizer.Momentum(
         parameters=[{
             'params': backbone.parameters(),
@@ -108,21 +124,19 @@ def main(args):
         optimizer = fleet.distributed_optimizer(optimizer)
 
     start_epoch = 0
-    total_step = int(
-        len(trainset) / args.batch_size / world_size * cfg.num_epoch)
     if rank == 0:
-        print("Total Step is: %d" % total_step)
+        print("Total Step is: %d" % total_steps)
 
     callback_verification = CallBackVerification(2000, rank, cfg.val_targets,
                                                  cfg.data_dir)
-    callback_logging = CallBackLogging(10, rank, total_step, args.batch_size,
+    callback_logging = CallBackLogging(10, rank, total_steps, args.batch_size,
                                        world_size, writer)
     callback_checkpoint = CallBackModelCheckpoint(rank, args.output,
                                                   args.network)
 
     loss = AverageMeter()
     global_step = 0
-    for epoch in range(start_epoch, cfg.num_epoch):
+    for epoch in range(start_epoch, total_epoch):
         for step, (img, label) in enumerate(train_loader):
             label = label.flatten()
             global_step += 1
@@ -139,8 +153,9 @@ def main(args):
             loss.update(loss_v, 1)
             callback_logging(global_step, loss, epoch, lr_value)
             callback_verification(global_step, backbone)
+            lr_scheduler.step()
+
         callback_checkpoint(global_step, backbone, large_scale_classifier)
-        lr_scheduler.step()
     writer.close()
 
 
@@ -157,6 +172,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--loss', type=str, default='ArcFace', help='loss function')
     parser.add_argument('--lr', type=float, default=0.1, help='learning rate')
+    parser.add_argument('--lr_decay', type=float, default=0.1, help='learning rate decay factor')
     parser.add_argument(
         '--batch_size', type=int, default=512, help='batch size')
     parser.add_argument(

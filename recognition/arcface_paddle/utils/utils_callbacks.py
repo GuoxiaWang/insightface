@@ -18,7 +18,7 @@ import paddle
 import logging
 from eval import verification
 from utils.utils_logging import AverageMeter
-from partial_fc import PartialFC
+from classifier import LargeScaleClassifier
 import time
 
 
@@ -97,8 +97,7 @@ class CallBackLogging(object):
                  global_step,
                  loss: AverageMeter,
                  epoch: int,
-                 lr_backbone_value,
-                 lr_pfc_value):
+                 lr_value):
         if self.rank is 0 and global_step > 0 and global_step % self.frequent == 0:
             if self.init:
                 try:
@@ -115,10 +114,10 @@ class CallBackLogging(object):
                     self.writer.add_scalar('time_for_end', time_for_end,
                                            global_step)
                     self.writer.add_scalar('loss', loss.avg, global_step)
-                msg = "Speed %.2f samples/sec   Loss %.4f   Epoch: %d   Global Step: %d   Required: %1.f hours, lr_backbone_value: %f, lr_pfc_value: %f" % (
-                    speed_total, loss.avg, epoch, global_step, time_for_end,
-                    lr_backbone_value, lr_pfc_value)
+                msg = "Loss %.4f   Epoch: %d   Global Step: %d   Required: %1.f hours, lr_value: %f, throughput: %.2f samples/sec" % (
+                    loss.avg, epoch, global_step, time_for_end, lr_value, speed_total)
                 logging.info(msg)
+                print(msg)
                 loss.reset()
                 self.tic = time.time()
             else:
@@ -135,10 +134,10 @@ class CallBackModelCheckpoint(object):
     def __call__(self,
                  global_step,
                  backbone: paddle.nn.Layer,
-                 partial_fc: PartialFC=None):
+                 classifier_net: LargeScaleClassifier=None):
         if global_step > 100 and self.rank is 0:
             paddle.save(backbone.state_dict(),
                         os.path.join(self.output,
                                      self.model_name + ".pdparams"))
-        if global_step > 100 and partial_fc is not None:
-            partial_fc.save_params()
+        if global_step > 100 and classifier_net is not None:
+            classifier_net.save_params()

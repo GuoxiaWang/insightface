@@ -15,19 +15,16 @@
 from easydict import EasyDict as edict
 
 config = edict()
-config.sample_rate = 1
+config.sample_rate = 0.1
 config.momentum = 0.9
 
-config.data_dir = "./MS1M_bin"
-config.file_list = "MS1M_bin/label.txt"
+config.data_dir = "/wangguoxia/plsc/MS1M_v2/"
+config.file_list = "/wangguoxia/plsc/MS1M_v2/label.txt"
 config.num_classes = 85742
-config.num_epoch = 32
-config.warmup_epoch = 1
+config.lr = 0.1 # for global batch size = 512
+config.lr_decay = 0.1
+config.train_unit = 'step' # 'step' or 'epoch'
+config.warmup_num = 1000
+config.train_num = 180000
+config.decay_boundaries = [100000, 140000, 160000]
 config.val_targets = ["lfw", "cfp_fp", "agedb_30"]
-
-def lr_step_func(epoch):
-    return ((epoch + 1) / (4 + 1))**2 if epoch < -1 else 0.1**len(
-        [m for m in [6, 12, 18, 24] if m - 1 <= epoch])
-
-
-config.lr_func = lr_step_func

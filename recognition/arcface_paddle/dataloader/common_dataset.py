@@ -54,7 +54,7 @@ class CommonDataset(Dataset):
 
             img_path, label = line.split(self.delimiter)
             label = int(label)
-            label = paddle.to_tensor(label, dtype='int64')
+            label = paddle.to_tensor(label, dtype='int32')
             img_path = os.path.join(self.root_dir, img_path)
             if self.is_bin:
                 img = read_img_from_bin(img_path)
