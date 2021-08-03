@@ -21,7 +21,7 @@ import random
 import paddle
 import numpy as np
 
-from dataloader.kv_helper import read_img_from_bin
+from datasets.kv_helper import read_img_from_bin
 
 
 class CommonDataset(Dataset):
@@ -67,6 +67,30 @@ class CommonDataset(Dataset):
         except Exception as e:
             print("data read faild: {}, exception info: {}".format(line, e))
             return self.__getitem__(random.randint(0, len(self)))
+
+    def __len__(self):
+        return self.num_samples
+
+class SyntheticDataset(Dataset):
+    def __init__(self, num_classes):
+        super(SyntheticDataset, self).__init__()
+        self.num_classes = num_classes
+        self.transform = transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+        ])
+
+        self.label_list = np.random.randint(0, num_classes, (100000,), dtype=np.int32)
+        self.num_samples = len(self.label_list)
+
+    def __getitem__(self, idx):
+        label = self.label_list[idx]
+        img = np.random.randint(0, 255, size=(112, 112, 3), dtype=np.uint8)
+        label = paddle.to_tensor(label, dtype='int32')
+        img = self.transform(img)
+        return img, label
 
     def __len__(self):
         return self.num_samples

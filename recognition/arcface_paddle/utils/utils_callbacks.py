@@ -24,11 +24,13 @@ import time
 
 class CallBackVerification(object):
     def __init__(self,
+                 do_validation_while_train,
                  frequent,
                  rank,
                  val_targets,
                  rec_prefix,
                  image_size=(112, 112)):
+        self.do_validation_while_train: bool = do_validation_while_train
         self.frequent: int = frequent
         self.rank: int = rank
         self.highest_acc: float = 0.0
@@ -68,7 +70,8 @@ class CallBackVerification(object):
                 self.ver_name_list.append(name)
 
     def __call__(self, num_update, backbone: paddle.nn.Layer, batch_size=10):
-        if self.rank == 0 and num_update > 0 and num_update % self.frequent == 0:
+        if self.do_validation_while_train and self.rank == 0 and \
+                num_update > 0 and num_update % self.frequent == 0:
             backbone.eval()
             self.ver_test(backbone, num_update, batch_size)
             backbone.train()

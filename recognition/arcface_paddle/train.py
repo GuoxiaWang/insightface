@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataloader import CommonDataset
+from datasets import CommonDataset, SyntheticDataset
 
 from paddle.io import DataLoader
 from config import config as cfg
@@ -54,9 +54,12 @@ def main(args):
         os.makedirs(args.output)
     else:
         time.sleep(2)
-
     writer = LogWriter(logdir=args.logdir)
-    trainset = CommonDataset(root_dir=cfg.data_dir, label_file=cfg.file_list, is_bin=args.is_bin)
+
+    if args.dataset == 'synthetic':
+        trainset = SyntheticDataset(args.num_classes)
+    else:
+        trainset = CommonDataset(root_dir=args.data_dir, label_file=args.label_file, is_bin=args.is_bin)
     train_loader = DataLoader(
         dataset=trainset,
         batch_size=args.batch_size,
@@ -72,16 +75,16 @@ def main(args):
     margin_loss_params = eval("losses.{}".format(args.loss))()
 
     large_scale_classifier = LargeScaleClassifier(
-        rank=0,
-        world_size=1,
-        resume=0,
+        rank=rank,
+        world_size=world_size,
+        resume=args.resume,
         batch_size=args.batch_size,
-        num_classes=cfg.num_classes,
+        num_classes=args.num_classes,
         margin1=margin_loss_params.margin1,
         margin2=margin_loss_params.margin2,
         margin3=margin_loss_params.margin3,
         scale=margin_loss_params.scale,
-        sample_rate=cfg.sample_rate,
+        sample_rate=args.sample_rate,
         embedding_size=args.embedding_size,
         prefix=args.output)
     large_scale_classifier.train()
@@ -89,15 +92,15 @@ def main(args):
     num_image = len(trainset)
     total_batch_size = args.batch_size * world_size
     steps_per_epoch = num_image // total_batch_size
-    if cfg.train_unit == 'epoch':
-        warmup_steps = steps_per_epoch * cfg.warmup_num
-        total_steps = steps_per_epoch * cfg.train_num
-        decay_steps = [x * steps_per_epoch for x in cfg.decay_boundaries]
-        total_epoch = cfg.train_num
+    if args.train_unit == 'epoch':
+        warmup_steps = steps_per_epoch * args.warmup_num
+        total_steps = steps_per_epoch * args.train_num
+        decay_steps = [x * steps_per_epoch for x in args.decay_boundaries]
+        total_epoch = args.train_num
     else:
-        warmup_steps = cfg.warmup_num
-        total_steps = cfg.train_num
-        decay_steps = [x for x in cfg.decay_boundaries]
+        warmup_steps = args.warmup_num
+        total_steps = args.train_num
+        decay_steps = [x for x in args.decay_boundaries]
         total_epoch = (total_steps + steps_per_epoch - 1) // steps_per_epoch
 
     base_lr = total_batch_size * args.lr / 512
@@ -116,7 +119,7 @@ def main(args):
             'params': large_scale_classifier.parameters(),
         }],
         learning_rate=lr_scheduler,
-        momentum=0.9,
+        momentum=args.momentum,
         weight_decay=args.weight_decay,
         grad_clip=clip_by_norm)
 
@@ -127,9 +130,9 @@ def main(args):
     if rank == 0:
         print("Total Step is: %d" % total_steps)
 
-    callback_verification = CallBackVerification(2000, rank, cfg.val_targets,
-                                                 cfg.data_dir)
-    callback_logging = CallBackLogging(10, rank, total_steps, args.batch_size,
+    callback_verification = CallBackVerification(args.do_validation_while_train, args.validation_interval_step,
+                                                 rank, args.val_targets, args.data_dir)
+    callback_logging = CallBackLogging(args.log_interval_step, rank, total_steps, args.batch_size,
                                        world_size, writer)
     callback_checkpoint = CallBackModelCheckpoint(rank, args.output,
                                                   args.network)
@@ -161,28 +164,83 @@ def main(args):
 
 if __name__ == '__main__':
     def str2bool(v):
-        return v.lower() in ("true", "t", "1")
+        return str(v).lower() in ("true", "t", "1")
+
+    def tostrlist(v):
+        if isinstance(v, list):
+            return v
+        elif isinstance(v, str):
+            return [e.strip() for e in v.split(',')]
+
+    def tointlist(v):
+        if isinstance(v, list):
+            return v
+        elif isinstance(v, str):
+            return [int(e.strip()) for e in v.split(',')]
     
-    parser = argparse.ArgumentParser(description='Paddle ArcFace Training')
+    parser = argparse.ArgumentParser(description='Paddle Face Training')
+
+    # Model setting
     parser.add_argument(
-        '--network',
-        type=str,
-        default='MobileFaceNet_128',
-        help='backbone network')
+        '--network', type=str, default=cfg.network, help='backbone network')
     parser.add_argument(
-        '--loss', type=str, default='ArcFace', help='loss function')
-    parser.add_argument('--lr', type=float, default=0.1, help='learning rate')
-    parser.add_argument('--lr_decay', type=float, default=0.1, help='learning rate decay factor')
+        '--embedding_size', type=int, default=cfg.embedding_size, help='embedding size')
     parser.add_argument(
-        '--batch_size', type=int, default=512, help='batch size')
+        '--model_parallel', type=str2bool, default=cfg.model_parallel, help='whether to use model parallel')
     parser.add_argument(
-        '--weight_decay', type=float, default=2e-4, help='weight decay')
+        '--sample_rate', type=float, default=cfg.sample_rate, help='sample rate, use partial fc sample if sample rate less than 1.0')
     parser.add_argument(
-        '--embedding_size', type=int, default=128, help='embedding size')
-    parser.add_argument('--logdir', type=str, default='./log', help='log dir')
+        '--loss', type=str, default=cfg.loss, help='loss function')
+
+    # Optimizer setting
     parser.add_argument(
-        '--output', type=str, default='emore_arcface', help='output dir')
-    parser.add_argument('--resume', type=int, default=0, help='model resuming')
-    parser.add_argument('--is_bin', type=str2bool, default=True, help='whether the train data is bin or original image file')
+        '--lr', type=float, default=cfg.lr, help='learning rate')
+    parser.add_argument(
+        '--lr_decay', type=float, default=cfg.lr_decay, help='learning rate decay factor')
+    parser.add_argument(
+        '--weight_decay', type=float, default=cfg.weight_decay, help='weight decay')
+    parser.add_argument(
+        '--momentum', type=float, default=cfg.momentum, help='sgd momentum')
+    parser.add_argument(
+        '--train_unit', type=str, default=cfg.train_unit, help='train unit, "step" or "epoch"')
+    parser.add_argument(
+        '--warmup_num', type=int, default=cfg.warmup_num, help='warmup num according train unit')
+    parser.add_argument(
+        '--train_num', type=int, default=cfg.train_num, help='train num according train unit')
+    parser.add_argument(
+        '--decay_boundaries', type=tointlist, default=cfg.decay_boundaries, help='piecewise decay boundaries')
+
+    # Train dataset setting
+    parser.add_argument(
+        '--dataset', type=str, default=cfg.dataset, help='train dataset name')
+    parser.add_argument(
+        '--data_dir', type=str, default=cfg.data_dir, help='train dataset directory')
+    parser.add_argument(
+        '--label_file', type=str, default=cfg.label_file, help='train label file name, each line split by "\t"')
+    parser.add_argument(
+        '--is_bin', type=str2bool, default=cfg.is_bin, help='whether the train data is bin or original image file')
+    parser.add_argument(
+        '--num_classes', type=int, default=cfg.num_classes, help='classes of train dataset')
+    parser.add_argument(
+        '--batch_size', type=int, default=cfg.batch_size, help='batch size of each rank')
+
+    # Validation dataset setting
+    parser.add_argument(
+        '--do_validation_while_train', type=str2bool, default=cfg.do_validation_while_train, help='do validation while train')
+    parser.add_argument(
+        '--validation_interval_step', type=int, default=cfg.validation_interval_step, help='validation interval step')
+    parser.add_argument(
+        '--val_targets', type=tostrlist, default=cfg.val_targets, help='val targets, list or str split by comma')
+
+    # IO setting
+    parser.add_argument(
+        '--logdir', type=str, default=cfg.logdir, help='log dir')
+    parser.add_argument(
+        '--log_interval_step', type=int, default=cfg.log_interval_step, help='log interval step')
+    parser.add_argument(
+        '--output', type=str, default=cfg.output, help='output dir')
+    parser.add_argument(
+        '--resume', type=str2bool, default=cfg.resume, help='model resuming')
+
     args = parser.parse_args()
     main(args)

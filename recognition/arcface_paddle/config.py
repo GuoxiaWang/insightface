@@ -15,16 +15,33 @@
 from easydict import EasyDict as edict
 
 config = edict()
+config.network = 'MobileFaceNet_128'
+config.embedding_size = 128
+config.model_parallel = True
 config.sample_rate = 0.1
-config.momentum = 0.9
+config.loss = 'ArcFace'
 
-config.data_dir = "/wangguoxia/plsc/MS1M_v2/"
-config.file_list = "/wangguoxia/plsc/MS1M_v2/label.txt"
-config.num_classes = 85742
 config.lr = 0.1 # for global batch size = 512
 config.lr_decay = 0.1
+config.weight_decay = 2e-4
+config.momentum = 0.9
 config.train_unit = 'step' # 'step' or 'epoch'
 config.warmup_num = 1000
 config.train_num = 180000
 config.decay_boundaries = [100000, 140000, 160000]
+
+config.dataset = "emore"
+config.data_dir = "/wangguoxia/plsc/MS1M_v2/"
+config.label_file = "/wangguoxia/plsc/MS1M_v2/label.txt"
+config.is_bin = True
+config.num_classes = 85742
+config.batch_size = 512 # for 1 GPU
+
+config.do_validation_while_train = True
+config.validation_interval_step = 2000
 config.val_targets = ["lfw", "cfp_fp", "agedb_30"]
+
+config.logdir = './log'
+config.log_interval_step = 10
+config.output = './emore_arcface'
+config.resume = False
