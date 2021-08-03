@@ -18,7 +18,7 @@ from paddle.io import DataLoader
 from config import config as cfg
 from classifier import LargeScaleClassifier
 from utils.utils_callbacks import CallBackVerification, CallBackLogging, CallBackModelCheckpoint
-from utils.utils_logging import AverageMeter
+from utils.utils_logging import AverageMeter, init_logging
 from paddle.nn import ClipGradByNorm
 from visualdl import LogWriter
 import paddle
@@ -36,6 +36,7 @@ RELATED_FLAGS_SETTING = {
 }
 paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
+
 def main(args):
 
 
@@ -46,14 +47,15 @@ def main(args):
     place = paddle.CUDAPlace(gpu_id)
 
     if world_size > 1:
+        import paddle.distributed.fleet as fleet
+        from utils.utils_data_parallel import sync_gradients
+
         strategy = fleet.DistributedStrategy()
         strategy.without_graph_optimization = True
         fleet.init(is_collective=True, strategy=strategy)
 
-    if not os.path.exists(args.output):
-        os.makedirs(args.output)
-    else:
-        time.sleep(2)
+    os.makedirs(args.output, exist_ok=True)
+    init_logging(rank, args.output)
     writer = LogWriter(logdir=args.logdir)
 
     if args.dataset == 'synthetic':
@@ -68,7 +70,7 @@ def main(args):
         drop_last=True,
         num_workers=0)
 
-    backbone = eval("backbones.{}".format(args.network))()
+    backbone = eval("backbones.{}".format(args.network))(num_features=args.embedding_size)
     backbone.train()
 
     clip_by_norm = ClipGradByNorm(5.0)
@@ -113,11 +115,12 @@ def main(args):
         base_lr)
 
     optimizer = paddle.optimizer.Momentum(
-        parameters=[{
-            'params': backbone.parameters(),
-        }, {
-            'params': large_scale_classifier.parameters(),
-        }],
+         parameters=backbone.parameters() + large_scale_classifier.parameters(),
+#        parameters=[{
+#            'params': backbone.parameters(),
+#        }, {
+#            'params': large_scale_classifier.parameters(),
+#        }],
         learning_rate=lr_scheduler,
         momentum=args.momentum,
         weight_decay=args.weight_decay,
@@ -132,7 +135,7 @@ def main(args):
 
     callback_verification = CallBackVerification(args.do_validation_while_train, args.validation_interval_step,
                                                  rank, args.val_targets, args.data_dir)
-    callback_logging = CallBackLogging(args.log_interval_step, rank, total_steps, args.batch_size,
+    callback_logging = CallBackLogging(args.log_interval_step, rank, total_steps, total_batch_size,
                                        world_size, writer)
     callback_checkpoint = CallBackModelCheckpoint(rank, args.output,
                                                   args.network)
@@ -147,6 +150,9 @@ def main(args):
             features = backbone(img)
             loss_v = large_scale_classifier(features, label, optimizer)
             loss_v.backward()
+#            if world_size > 1:
+                # sync backbone gradients
+#                sync_gradients(backbone.parameters())
             optimizer.step()
             optimizer.clear_grad()
 

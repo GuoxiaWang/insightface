@@ -58,6 +58,8 @@ class LargeScaleClassifier(nn.Layer):
         self.margin3 = margin3
         self.logit_scale = scale
 
+        self.stream: paddle.device.cuda.Stream = paddle.device.cuda.Stream(self.rank)
+
         self.weight_name = os.path.join(
             self.prefix, "rank:{}_softmax_weight.pkl".format(self.rank))
         self.weight_mom_name = os.path.join(
@@ -118,7 +120,6 @@ class LargeScaleClassifier(nn.Layer):
             # partial fc sample process
             total_label, self.index = paddle.class_center_sample(
                 total_label, self.num_local, self.num_sample)
-            # TODO(GuoxiaWang)
             sub_weight_tensor = self.weight[self.index]
             self.sub_weight = paddle.create_parameter(
                 shape=sub_weight_tensor.shape,
@@ -128,7 +129,6 @@ class LargeScaleClassifier(nn.Layer):
             optimizer._accumulators['velocity'].pop(optimizer._parameter_list[-1]['params'][0], None)
             optimizer._parameter_list[-1]['params'][0] = self.sub_weight
             optimizer._accumulators['velocity'][self.sub_weight.name] = self.sub_weight_mom
-            # END TODO
         return total_label
 
     def forward(self, feature, label, optimizer):

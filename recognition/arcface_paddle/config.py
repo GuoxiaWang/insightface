@@ -15,8 +15,8 @@
 from easydict import EasyDict as edict
 
 config = edict()
-config.network = 'MobileFaceNet_128'
-config.embedding_size = 128
+config.network = 'iresnet100'
+config.embedding_size = 512
 config.model_parallel = True
 config.sample_rate = 0.1
 config.loss = 'ArcFace'
@@ -31,11 +31,11 @@ config.train_num = 180000
 config.decay_boundaries = [100000, 140000, 160000]
 
 config.dataset = "emore"
-config.data_dir = "/wangguoxia/plsc/MS1M_v2/"
-config.label_file = "/wangguoxia/plsc/MS1M_v2/label.txt"
+config.data_dir = "./MS1M_bin"
+config.label_file = "./MS1M_binlabel.txt"
 config.is_bin = True
 config.num_classes = 85742
-config.batch_size = 512 # for 1 GPU
+config.batch_size = 64 # 512 for 1 GPU
 
 config.do_validation_while_train = True
 config.validation_interval_step = 2000

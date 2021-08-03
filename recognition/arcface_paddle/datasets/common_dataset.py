@@ -20,6 +20,7 @@ from PIL import Image
 import random
 import paddle
 import numpy as np
+import logging
 
 from datasets.kv_helper import read_img_from_bin
 
@@ -29,7 +30,7 @@ class CommonDataset(Dataset):
         super(CommonDataset, self).__init__()
         self.root_dir = root_dir
         self.label_file = label_file
-        self.full_lines = self.get_file_list(label_file)
+        self.partial_lines = self.get_file_list(label_file)
         self.delimiter = "\t"
         self.is_bin = is_bin
         self.transform = transforms.Compose([
@@ -39,22 +40,33 @@ class CommonDataset(Dataset):
                 mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
         ])
 
-        self.num_samples = len(self.full_lines)
+        self.num_samples = len(self.partial_lines)
 
     def get_file_list(self, label_file):
         with open(label_file, "r") as fin:
             full_lines = fin.readlines()
 
-        print("finish reading file, image num: {}".format(len(full_lines)))
-        return full_lines
+        random.shuffle(full_lines)
+        partial_lines = []
+        rank = int(os.getenv("PADDLE_TRAINER_ID", "0"))
+        world_size = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+        per_rank_lines = (len(full_lines) + world_size - 1) // world_size
+        lack_lines = per_rank_lines * world_size - len(full_lines)
+        full_lines += full_lines[0:lack_lines]
+        start_line = rank * per_rank_lines
+        end_line = (rank + 1) * per_rank_lines
+        partial_lines = full_lines[start_line:end_line]
+
+        logging.info("rank: {}/{}, finish reading file, image num: {}, from: {} to: {}, total num: {}"
+            .format(rank, world_size, len(partial_lines), start_line, end_line, len(full_lines)))
+        return partial_lines
 
     def __getitem__(self, idx):
         try:
-            line = self.full_lines[idx]
+            line = self.partial_lines[idx]
 
-            img_path, label = line.split(self.delimiter)
-            label = int(label)
-            label = paddle.to_tensor(label, dtype='int32')
+            img_path, label = line.strip().split(self.delimiter)
+            label = paddle.to_tensor(np.int32(label), dtype='int32')
             img_path = os.path.join(self.root_dir, img_path)
             if self.is_bin:
                 img = read_img_from_bin(img_path)
@@ -65,7 +77,7 @@ class CommonDataset(Dataset):
             return img, label
 
         except Exception as e:
-            print("data read faild: {}, exception info: {}".format(line, e))
+            logging.info("data read faild: {}, exception info: {}".format(line, e))
             return self.__getitem__(random.randint(0, len(self)))
 
     def __len__(self):

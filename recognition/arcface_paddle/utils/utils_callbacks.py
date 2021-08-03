@@ -101,31 +101,29 @@ class CallBackLogging(object):
                  loss: AverageMeter,
                  epoch: int,
                  lr_value):
-        if self.rank is 0 and global_step > 0 and global_step % self.frequent == 0:
-            if self.init:
-                try:
-                    speed: float = self.frequent * self.batch_size / (
-                        time.time() - self.tic)
-                    speed_total = speed * self.world_size
-                except ZeroDivisionError:
-                    speed_total = float('inf')
+        if self.init and self.rank is 0 and global_step > 0 and global_step % self.frequent == 0:
+            try:
+                speed: float = self.frequent * self.batch_size / (
+                    time.time() - self.tic)
+                speed_total = speed * self.world_size
+            except ZeroDivisionError:
+                speed_total = float('inf')
 
-                time_now = (time.time() - self.time_start) / 3600
-                time_total = time_now / ((global_step + 1) / self.total_step)
-                time_for_end = time_total - time_now
-                if self.writer is not None:
-                    self.writer.add_scalar('time_for_end', time_for_end,
-                                           global_step)
-                    self.writer.add_scalar('loss', loss.avg, global_step)
-                msg = "Loss %.4f   Epoch: %d   Global Step: %d   Required: %1.f hours, lr_value: %f, throughput: %.2f samples/sec" % (
-                    loss.avg, epoch, global_step, time_for_end, lr_value, speed_total)
-                logging.info(msg)
-                print(msg)
-                loss.reset()
-                self.tic = time.time()
-            else:
-                self.init = True
-                self.tic = time.time()
+            time_now = (time.time() - self.time_start) / 3600
+            time_total = time_now / ((global_step + 1) / self.total_step)
+            time_for_end = time_total - time_now
+            if self.writer is not None:
+                self.writer.add_scalar('time_for_end', time_for_end,
+                                       global_step)
+                self.writer.add_scalar('loss', loss.avg, global_step)
+            msg = "loss %.4f, epoch: %d, Step: %d, eta: %1.2f hours, lr: %f, throughput: %.2f samples/sec" % (
+                loss.avg, epoch, global_step, time_for_end, lr_value, speed_total)
+            logging.info(msg)
+            loss.reset()
+            self.tic = time.time()
+        else:
+            self.init = True
+            self.tic = time.time()
 
 
 class CallBackModelCheckpoint(object):

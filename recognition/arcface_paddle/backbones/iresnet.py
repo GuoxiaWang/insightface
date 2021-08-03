@@ -57,12 +57,12 @@ class IBasicBlock(nn.Layer):
         if dilation > 1:
             raise NotImplementedError(
                 "Dilation > 1 not supported in BasicBlock")
-        self.bn1 = nn.BatchNorm2D(inplanes, epsilon=1e-05, momentum=0.1)
+        self.bn1 = nn.BatchNorm2D(inplanes, epsilon=1e-05, momentum=0.9)
         self.conv1 = conv3x3(inplanes, planes)
-        self.bn2 = nn.BatchNorm2D(planes, epsilon=1e-05, momentum=0.1)
+        self.bn2 = nn.BatchNorm2D(planes, epsilon=1e-05, momentum=0.9)
         self.prelu = nn.PReLU(planes)
         self.conv2 = conv3x3(planes, planes, stride)
-        self.bn3 = nn.BatchNorm2D(planes, epsilon=1e-05, momentum=0.1)
+        self.bn3 = nn.BatchNorm2D(planes, epsilon=1e-05, momentum=0.9)
         self.downsample = downsample
         self.stride = stride
 
@@ -112,7 +112,7 @@ class IResNet(nn.Layer):
             stride=1,
             padding=1,
             bias_attr=False)
-        self.bn1 = nn.BatchNorm2D(self.inplanes, epsilon=1e-05, momentum=0.1)
+        self.bn1 = nn.BatchNorm2D(self.inplanes, epsilon=1e-05, momentum=0.9)
         self.prelu = nn.PReLU(self.inplanes)
         self.layer1 = self._make_layer(block, 64, layers[0], stride=2)
         self.layer2 = self._make_layer(
@@ -134,20 +134,16 @@ class IResNet(nn.Layer):
             stride=2,
             dilate=replace_stride_with_dilation[2])
         self.bn2 = nn.BatchNorm2D(
-            512 * block.expansion, epsilon=1e-05, momentum=0.1)
+            512 * block.expansion, epsilon=1e-05, momentum=0.9)
         self.dropout = nn.Dropout(p=dropout)
         self.fc = nn.Linear(512 * block.expansion * self.fc_scale,
                             num_features)
         self.features = nn.BatchNorm1D(
-            num_features, momentum=0.1, epsilon=1e-05)
+            num_features, momentum=0.9, epsilon=1e-05)
         self.features.weight = paddle.create_parameter(
             shape=self.features.weight.shape,
             dtype='float32',
             default_initializer=nn.initializer.Constant(value=1.0))
-        # nn.init.constant_(self.features.weight, 1.0)
-        # 修改了stop_gradient，将True设为False
-        self.features.weight.stop_gradient = False
-        #self.features.weight.requires_grad = False
 
         for m in self.sublayers():
             if isinstance(m, nn.Conv2D):
@@ -188,7 +184,7 @@ class IResNet(nn.Layer):
             downsample = nn.Sequential(
                 conv1x1(self.inplanes, planes * block.expansion, stride),
                 nn.BatchNorm2D(
-                    planes * block.expansion, epsilon=1e-05, momentum=0.1), )
+                    planes * block.expansion, epsilon=1e-05, momentum=0.9), )
         layers = []
         layers.append(
             block(self.inplanes, planes, stride, downsample, self.groups,
@@ -206,7 +202,7 @@ class IResNet(nn.Layer):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        with paddle.amp.auto_cast():
+        with paddle.amp.auto_cast(self.fp16):
             x = self.conv1(x)
             x = self.bn1(x)
             x = self.prelu(x)
