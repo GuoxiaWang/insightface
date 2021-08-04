@@ -147,8 +147,8 @@ class MobileFaceNet(nn.Layer):
         return x
 
 
-def MobileFaceNet_128(feature_dim=128, **args):
-    model = MobileFaceNet(feature_dim=feature_dim, **args)
+def MobileFaceNet_128(num_features=128, **args):
+    model = MobileFaceNet(feature_dim=num_features, **args)
     return model
 
 

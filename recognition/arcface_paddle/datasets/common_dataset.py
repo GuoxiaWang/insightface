@@ -16,7 +16,6 @@ from paddle.io import Dataset
 from paddle.vision import transforms
 import os
 import cv2
-from PIL import Image
 import random
 import paddle
 import numpy as np
@@ -24,6 +23,17 @@ import logging
 
 from datasets.kv_helper import read_img_from_bin
 
+
+def transform(img):
+    # random horizontal flip
+    if random.randint(0, 1) == 0:
+        img = cv2.flip(img, 1)
+    # normalize to mean 0.5, std 0.5
+    img = (img - 127.5) * 0.00784313725
+    # BGR2RGB
+    img = img[:, :, ::-1]
+    img = np.transpose(img, (2, 0, 1))
+    return img
 
 class CommonDataset(Dataset):
     def __init__(self, root_dir, label_file, is_bin=True):
@@ -66,14 +76,15 @@ class CommonDataset(Dataset):
             line = self.partial_lines[idx]
 
             img_path, label = line.strip().split(self.delimiter)
-            label = paddle.to_tensor(np.int32(label), dtype='int32')
             img_path = os.path.join(self.root_dir, img_path)
             if self.is_bin:
                 img = read_img_from_bin(img_path)
             else:
                 img = cv2.imread(img_path)
-            img = img[:, :, ::-1]
-            img = self.transform(img)
+
+            img = transform(img)
+            img = paddle.to_tensor(img, dtype='float32')
+            label = paddle.to_tensor(np.int32(label), dtype='int32')
             return img, label
 
         except Exception as e:
@@ -87,21 +98,16 @@ class SyntheticDataset(Dataset):
     def __init__(self, num_classes):
         super(SyntheticDataset, self).__init__()
         self.num_classes = num_classes
-        self.transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-        ])
-
         self.label_list = np.random.randint(0, num_classes, (100000,), dtype=np.int32)
         self.num_samples = len(self.label_list)
 
     def __getitem__(self, idx):
         label = self.label_list[idx]
         img = np.random.randint(0, 255, size=(112, 112, 3), dtype=np.uint8)
+        img = transform(img)
+
+        img = paddle.to_tensor(img, dtype='float32')
         label = paddle.to_tensor(label, dtype='int32')
-        img = self.transform(img)
         return img, label
 
     def __len__(self):

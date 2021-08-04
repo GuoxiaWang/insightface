@@ -115,12 +115,11 @@ def main(args):
         base_lr)
 
     optimizer = paddle.optimizer.Momentum(
-         parameters=backbone.parameters() + large_scale_classifier.parameters(),
-#        parameters=[{
-#            'params': backbone.parameters(),
-#        }, {
-#            'params': large_scale_classifier.parameters(),
-#        }],
+        parameters=[{
+            'params': backbone.parameters(),
+        }, {
+            'params': large_scale_classifier.parameters(),
+        }],
         learning_rate=lr_scheduler,
         momentum=args.momentum,
         weight_decay=args.weight_decay,

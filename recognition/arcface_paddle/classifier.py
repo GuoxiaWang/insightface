@@ -18,7 +18,6 @@ import paddle.nn as nn
 from paddle.nn.functional import normalize, linear
 import pickle
 
-
 class LargeScaleClassifier(nn.Layer):
     """
     Author: {Xiang An, Yang Xiao, XuHan Zhu} in DeepGlint,
@@ -58,77 +57,57 @@ class LargeScaleClassifier(nn.Layer):
         self.margin3 = margin3
         self.logit_scale = scale
 
-        self.stream: paddle.device.cuda.Stream = paddle.device.cuda.Stream(self.rank)
-
         self.weight_name = os.path.join(
             self.prefix, "rank:{}_softmax_weight.pkl".format(self.rank))
         self.weight_mom_name = os.path.join(
             self.prefix, "rank:{}_softmax_weight_mom.pkl".format(self.rank))
 
-        if resume:
-            try:
-                self.weight: paddle.Tensor = paddle.load(self.weight_name)
-                print("softmax weight resume successfully!")
-            except (FileNotFoundError, KeyError, IndexError):
-                self.weight = paddle.normal(0, 0.01, (self.num_local,
-                                                      self.embedding_size))
-                print("softmax weight resume fail!")
-
-            try:
-                self.weight_mom: paddle.Tensor = paddle.load(
-                    self.weight_mom_name)
-                print("softmax weight mom resume successfully!")
-            except (FileNotFoundError, KeyError, IndexError):
-                self.weight_mom: paddle.Tensor = paddle.zeros_like(self.weight)
-                print("softmax weight mom resume fail!")
+        self.index = None
+        if int(self.sample_rate) == 1:
+            self.sub_weight = self.create_parameter(
+                shape=(self.num_local, self.embedding_size),
+                dtype='float32',
+                default_initializer=paddle.nn.initializer.Normal(std=0.01))
         else:
             self.weight = paddle.normal(0, 0.01,
                                         (self.num_local, self.embedding_size))
             self.weight_mom: paddle.Tensor = paddle.zeros_like(self.weight)
-            print("softmax weight init successfully!")
-            print("softmax weight mom init successfully!")
 
-        self.index = None
-        if int(self.sample_rate) == 1:
-            self.update = lambda: 0
-            self.sub_weight = paddle.create_parameter(
-                shape=self.weight.shape,
-                dtype='float32',
-                default_initializer=paddle.nn.initializer.Assign(self.weight))
-            self.sub_weight_mom = self.weight_mom
-        else:
-            self.sub_weight = paddle.create_parameter(
+            self.sub_weight = self.create_parameter(
                 shape=[1, 1],
                 dtype='float32',
                 default_initializer=paddle.nn.initializer.Assign(
                     paddle.empty((1, 1))))
 
+    @paddle.no_grad()
+    def update(self):
+        if int(self.sample_rate) != 1:
+            self.weight[self.index] = self.sub_weight
+            self.weight_mom[self.index] = self.sub_weight_mom
+
     def save_params(self):
+        return
         with open(self.weight_name, 'wb') as file:
             pickle.dump(self.weight.numpy(), file)
         with open(self.weight_mom_name, 'wb') as file:
             pickle.dump(self.weight_mom.numpy(), file)
 
-    @paddle.no_grad()
-    def update(self):
-        self.weight[self.index] = self.sub_weight
-        self.weight_mom[self.index] = self.sub_weight_mom
-
-    @paddle.no_grad()
     def sample(self, total_label, optimizer):
-        if int(self.sample_rate) != 1:
-            # partial fc sample process
+        # partial fc sample process
+        with paddle.fluid.dygraph.no_grad():
             total_label, self.index = paddle.class_center_sample(
                 total_label, self.num_local, self.num_sample)
-            sub_weight_tensor = self.weight[self.index]
-            self.sub_weight = paddle.create_parameter(
-                shape=sub_weight_tensor.shape,
-                dtype='float32',
-                default_initializer=paddle.nn.initializer.Assign(sub_weight_tensor))
-            self.sub_weight_mom = self.weight_mom[self.index]
-            optimizer._accumulators['velocity'].pop(optimizer._parameter_list[-1]['params'][0], None)
-            optimizer._parameter_list[-1]['params'][0] = self.sub_weight
-            optimizer._accumulators['velocity'][self.sub_weight.name] = self.sub_weight_mom
+
+        sub_weight_tensor = self.weight[self.index]
+        self.sub_weight = self.create_parameter(
+            shape=sub_weight_tensor.shape,
+            dtype='float32',
+            default_initializer=paddle.nn.initializer.Assign(sub_weight_tensor))
+        self.sub_weight_mom = self.weight_mom[self.index]
+        optimizer._accumulators['velocity'].pop(optimizer._parameter_list[-1]['params'][0], None)
+        optimizer._parameter_list[-1]['params'][0] = self.sub_weight
+        optimizer._accumulators['velocity'][self.sub_weight.name] = self.sub_weight_mom
+
         return total_label
 
     def forward(self, feature, label, optimizer):
@@ -144,14 +123,15 @@ class LargeScaleClassifier(nn.Layer):
             total_feature = feature
             total_label = label
 
+        if int(self.sample_rate) != 1:
+            total_label = self.sample(total_label, optimizer)
         total_label.stop_gradient = True
-        total_label = self.sample(total_label, optimizer)
 
         norm_feature = normalize(total_feature)
         norm_weight = normalize(self.sub_weight)
         logits = linear(norm_feature, paddle.t(norm_weight))
 
-        loss_v = paddle.nn.functional.margin_softmax_with_cross_entropy(
+        loss = paddle.nn.functional.margin_softmax_with_cross_entropy(
             logits,
             total_label,
             margin1=self.margin1,
@@ -159,6 +139,5 @@ class LargeScaleClassifier(nn.Layer):
             margin3=self.margin3,
             scale=self.logit_scale,
             return_softmax=False)
-        return loss_v
-
-
+        
+        return loss
