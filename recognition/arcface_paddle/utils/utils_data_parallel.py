@@ -14,6 +14,7 @@
 
 import paddle
 
+@paddle.no_grad()
 def sync_gradients(parameters):
     grad_var_set = set()
     grad_vars = []

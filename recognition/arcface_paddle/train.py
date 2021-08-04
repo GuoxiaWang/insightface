@@ -37,6 +37,12 @@ RELATED_FLAGS_SETTING = {
 paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
 
+def print_args(args):
+    print('\n--------args----------')
+    for k in list(vars(args).keys()):
+        print('%s: %s' % (k, vars(args)[k]))
+    print('--------args----------\n')
+
 def main(args):
 
 
@@ -134,7 +140,7 @@ def main(args):
 
     callback_verification = CallBackVerification(args.do_validation_while_train, args.validation_interval_step,
                                                  rank, args.val_targets, args.data_dir)
-    callback_logging = CallBackLogging(args.log_interval_step, rank, total_steps, total_batch_size,
+    callback_logging = CallBackLogging(args.log_interval_step, rank, total_steps, args.batch_size,
                                        world_size, writer)
     callback_checkpoint = CallBackModelCheckpoint(rank, args.output,
                                                   args.network)
@@ -149,9 +155,9 @@ def main(args):
             features = backbone(img)
             loss_v = large_scale_classifier(features, label, optimizer)
             loss_v.backward()
-#            if world_size > 1:
-                # sync backbone gradients
-#                sync_gradients(backbone.parameters())
+            if world_size > 1:
+                # data parallel sync backbone gradients
+                sync_gradients(backbone.parameters())
             optimizer.step()
             optimizer.clear_grad()
 
@@ -248,4 +254,5 @@ if __name__ == '__main__':
         '--resume', type=str2bool, default=cfg.resume, help='model resuming')
 
     args = parser.parse_args()
+    print_args(args)
     main(args)

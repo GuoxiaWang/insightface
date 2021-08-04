@@ -116,8 +116,8 @@ class CallBackLogging(object):
                 self.writer.add_scalar('time_for_end', time_for_end,
                                        global_step)
                 self.writer.add_scalar('loss', loss.avg, global_step)
-            msg = "loss %.4f, epoch: %d, Step: %d, eta: %1.2f hours, lr: %f, throughput: %.2f samples/sec" % (
-                loss.avg, epoch, global_step, time_for_end, lr_value, speed_total)
+            msg = "loss %.4f, lr: %f, epoch: %d, step: %d, eta: %1.2f hours, throughput: %.2f imgs/sec" % (
+                loss.avg, lr_value, epoch, global_step, time_for_end, speed_total)
             logging.info(msg)
             loss.reset()
             self.tic = time.time()
