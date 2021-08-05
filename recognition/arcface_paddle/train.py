@@ -41,7 +41,7 @@ def print_args(args):
     print('\n--------args----------')
     for k in list(vars(args).keys()):
         print('%s: %s' % (k, vars(args)[k]))
-    print('--------args----------\n')
+    print('------------------------\n')
 
 def main(args):
 
@@ -158,6 +158,7 @@ def main(args):
             if world_size > 1:
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())
+                
             optimizer.step()
             optimizer.clear_grad()
 

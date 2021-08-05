@@ -93,19 +93,20 @@ class CallBackLogging(object):
         self.world_size: int = world_size
         self.writer = writer
 
-        self.init = False
-        self.tic = 0
+        self.tic = time.time()
 
     def __call__(self,
                  global_step,
                  loss: AverageMeter,
                  epoch: int,
                  lr_value):
-        if self.init and self.rank is 0 and global_step > 0 and global_step % self.frequent == 0:
+            
+        if self.rank is 0 and global_step > 0 and global_step % self.frequent == 0:
             try:
                 speed: float = self.frequent * self.batch_size / (
                     time.time() - self.tic)
                 speed_total = speed * self.world_size
+                
             except ZeroDivisionError:
                 speed_total = float('inf')
 
@@ -121,10 +122,6 @@ class CallBackLogging(object):
             logging.info(msg)
             loss.reset()
             self.tic = time.time()
-        else:
-            self.init = True
-            self.tic = time.time()
-
 
 class CallBackModelCheckpoint(object):
     def __init__(self, rank, output="./", model_name="mobilefacenet"):

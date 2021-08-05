@@ -69,18 +69,23 @@ class LargeScaleClassifier(nn.Layer):
                 dtype='float32',
                 default_initializer=paddle.nn.initializer.Normal(std=0.01))
         else:
-            self.weight = paddle.normal(0, 0.01,
-                                        (self.num_local, self.embedding_size))
-            self.weight_mom: paddle.Tensor = paddle.zeros_like(self.weight)
+#             self.weight = paddle.normal(0, 0.01,
+#                                         (self.num_local, self.embedding_size))
+#             self.weight_mom: paddle.Tensor = paddle.zeros_like(self.weight)
 
-            self.sub_weight = self.create_parameter(
-                shape=[1, 1],
+#             self.sub_weight = self.create_parameter(
+#                 shape=[1, 1],
+#                 dtype='float32',
+#                 default_initializer=paddle.nn.initializer.Assign(
+#                     paddle.empty((1, 1))))
+            self.weight = self.create_parameter(
+                shape=(self.num_local, self.embedding_size),
                 dtype='float32',
-                default_initializer=paddle.nn.initializer.Assign(
-                    paddle.empty((1, 1))))
-
+                default_initializer=paddle.nn.initializer.Normal(std=0.01))
+    
     @paddle.no_grad()
     def update(self):
+        return
         if int(self.sample_rate) != 1:
             self.weight[self.index] = self.sub_weight
             self.weight_mom[self.index] = self.sub_weight_mom
@@ -98,15 +103,16 @@ class LargeScaleClassifier(nn.Layer):
             total_label, self.index = paddle.class_center_sample(
                 total_label, self.num_local, self.num_sample)
 
-        sub_weight_tensor = self.weight[self.index]
-        self.sub_weight = self.create_parameter(
-            shape=sub_weight_tensor.shape,
-            dtype='float32',
-            default_initializer=paddle.nn.initializer.Assign(sub_weight_tensor))
-        self.sub_weight_mom = self.weight_mom[self.index]
-        optimizer._accumulators['velocity'].pop(optimizer._parameter_list[-1]['params'][0], None)
-        optimizer._parameter_list[-1]['params'][0] = self.sub_weight
-        optimizer._accumulators['velocity'][self.sub_weight.name] = self.sub_weight_mom
+        self.sub_weight = self.weight[self.index]
+#         sub_weight_tensor = self.weight[self.index]
+#         self.sub_weight = self.create_parameter(
+#             shape=sub_weight_tensor.shape,
+#             dtype='float32',
+#             default_initializer=paddle.nn.initializer.Assign(sub_weight_tensor))
+#         self.sub_weight_mom = self.weight_mom[self.index]
+#         optimizer._accumulators['velocity'].pop(optimizer._parameter_list[-1]['params'][0].name, None)
+#         optimizer._parameter_list[-1]['params'][0] = self.sub_weight
+#         optimizer._accumulators['velocity'][self.sub_weight.name] = self.sub_weight_mom
 
         return total_label
 
