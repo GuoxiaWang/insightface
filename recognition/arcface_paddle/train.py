@@ -77,6 +77,10 @@ def main(args):
         num_workers=0)
 
     backbone = eval("backbones.{}".format(args.network))(num_features=args.embedding_size)
+    if args.resume:
+        checkpoint_path = os.path.join(args.output, args.network + '.pdparams')
+        param_state_dict = paddle.load(checkpoint_path)
+        backbone.set_dict(param_state_dict)
     backbone.train()
 
     clip_by_norm = ClipGradByNorm(5.0)

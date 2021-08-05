@@ -13,4 +13,4 @@
 # limitations under the License.
 
 from .mobilefacenet import MobileFaceNet_128
-from .iresnet import iresnet18, iresnet34, iresnet50, iresnet100, iresnet200
+from .iresnet import FresResNet50, FresResNet100
