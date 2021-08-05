@@ -25,6 +25,7 @@ import backbones
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--network", type=str)
+    parser.add_argument("--embedding_size", type=int)
     parser.add_argument("--pretrained_model", type=str)
     parser.add_argument("--output_path", type=str, default="./inference")
 
@@ -42,12 +43,12 @@ def load_dygraph_pretrain(model, path=None):
 def main():
     args = parse_args()
 
-    net = eval("backbones.{}".format(args.network))()
-    load_dygraph_pretrain(net, path=args.pretrained_model)
-    net.eval()
+    backbone = eval("backbones.{}".format(args.network))(num_features=args.embedding_size)
+    load_dygraph_pretrain(backbone, path=args.pretrained_model)
+    backbone.eval()
 
-    net = to_static(net, input_spec=[paddle.static.InputSpec(shape=[None, 3, 112, 112], dtype='float32')])
-    paddle.jit.save(net, os.path.join(args.output_path, "inference"))
+    net = to_static(backbone, input_spec=[paddle.static.InputSpec(shape=[None, 3, 112, 112], dtype='float32')])
+    paddle.jit.save(backbone, os.path.join(args.output_path, "inference"))
 
 
 if __name__ == "__main__":
