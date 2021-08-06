@@ -80,6 +80,7 @@ def main(args):
     if args.resume:
         checkpoint_path = os.path.join(args.output, args.network + '.pdparams')
         param_state_dict = paddle.load(checkpoint_path)
+        print('Load checkpoint from {}.'.format(checkpoint_path))
         backbone.set_dict(param_state_dict)
     backbone.train()
 
@@ -102,8 +103,8 @@ def main(args):
     large_scale_classifier.train()
 
     num_image = len(trainset)
+    steps_per_epoch = num_image // args.batch_size
     total_batch_size = args.batch_size * world_size
-    steps_per_epoch = num_image // total_batch_size
     if args.train_unit == 'epoch':
         warmup_steps = steps_per_epoch * args.warmup_num
         total_steps = steps_per_epoch * args.train_num
@@ -114,6 +115,13 @@ def main(args):
         total_steps = args.train_num
         decay_steps = [x for x in args.decay_boundaries]
         total_epoch = (total_steps + steps_per_epoch - 1) // steps_per_epoch
+    
+    if rank == 0:
+        print('total_batch_size: {}'.format(total_batch_size))
+        print('warmup_steps: {}'.format(warmup_steps))
+        print('steps_per_epoch: {}'.format(steps_per_epoch))
+        print('total_steps: {}'.format(total_steps))
+        print('total_epoch: {}'.format(total_epoch))
 
     base_lr = total_batch_size * args.lr / 512
     lr_scheduler = paddle.optimizer.lr.LinearWarmup(
@@ -130,17 +138,15 @@ def main(args):
         }, {
             'params': large_scale_classifier.parameters(),
         }],
+#        parameters=backbone.parameters(),
         learning_rate=lr_scheduler,
         momentum=args.momentum,
         weight_decay=args.weight_decay,
         grad_clip=clip_by_norm)
 
+    print("large_scale_classifier.parameters(): ", large_scale_classifier.parameters())
     if world_size > 1:
         optimizer = fleet.distributed_optimizer(optimizer)
-
-    start_epoch = 0
-    if rank == 0:
-        print("Total Step is: %d" % total_steps)
 
     callback_verification = CallBackVerification(args.do_validation_while_train, args.validation_interval_step,
                                                  rank, args.val_targets, args.data_dir)
@@ -151,6 +157,7 @@ def main(args):
 
     loss = AverageMeter()
     global_step = 0
+    start_epoch = 0
     for epoch in range(start_epoch, total_epoch):
         for step, (img, label) in enumerate(train_loader):
             label = label.flatten()
@@ -164,9 +171,8 @@ def main(args):
                 sync_gradients(backbone.parameters())
                 
             optimizer.step()
+#            large_scale_classifier.update(optimizer.get_lr())
             optimizer.clear_grad()
-
-            large_scale_classifier.update()
 
             lr_value = optimizer._global_learning_rate().numpy()[0]
             loss.update(loss_v, 1)

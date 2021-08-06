@@ -62,33 +62,35 @@ class LargeScaleClassifier(nn.Layer):
         self.weight_mom_name = os.path.join(
             self.prefix, "rank:{}_softmax_weight_mom.pkl".format(self.rank))
 
-        self.index = None
-        if int(self.sample_rate) == 1:
-            self.sub_weight = self.create_parameter(
-                shape=(self.num_local, self.embedding_size),
-                dtype='float32',
-                default_initializer=paddle.nn.initializer.Normal(std=0.01))
-        else:
-#             self.weight = paddle.normal(0, 0.01,
-#                                         (self.num_local, self.embedding_size))
-#             self.weight_mom: paddle.Tensor = paddle.zeros_like(self.weight)
-
-#             self.sub_weight = self.create_parameter(
-#                 shape=[1, 1],
-#                 dtype='float32',
-#                 default_initializer=paddle.nn.initializer.Assign(
-#                     paddle.empty((1, 1))))
-            self.weight = self.create_parameter(
-                shape=(self.num_local, self.embedding_size),
-                dtype='float32',
-                default_initializer=paddle.nn.initializer.Normal(std=0.01))
+#         self.index = None
+#         self.weight: paddle.Tensor = paddle.normal(0, 0.01, (self.num_local, self.embedding_size))
+#         self.weight_mom: paddle.Tensor = paddle.zeros_like(self.weight)
+#         self.weight.stop_gradient = True
+#         self.weight_mom.stop_gradient = True
+        
+        self.weight = self.create_parameter(
+            shape=(self.num_local, self.embedding_size),
+            dtype='float32',
+            default_initializer=paddle.nn.initializer.Normal(std=0.01))
     
     @paddle.no_grad()
-    def update(self):
-        return
+    def update(self, learning_rate):
+        """
+            $$
+            velocity = mu * velocity + gradient \\
+            if (use\_nesterov):   \\
+              param = param - (gradient + mu * velocity) * learning\_rate \\
+            else:   \\
+              param = param - learning\_rate * velocity. \\
+            $$
+        """
         if int(self.sample_rate) != 1:
-            self.weight[self.index] = self.sub_weight
-            self.weight_mom[self.index] = self.sub_weight_mom
+            mu = 0.9
+            weight_decay = 2e-4
+            grad = weight_decay * self.sub_weight + self.sub_weight.grad
+            self.weight_mom *= mu
+            self.weight_mom[self.index] += grad
+            self.weight -= learning_rate * self.weight_mom
 
     def save_params(self):
         return
@@ -104,6 +106,8 @@ class LargeScaleClassifier(nn.Layer):
                 total_label, self.num_local, self.num_sample)
 
         self.sub_weight = self.weight[self.index]
+        self.sub_weight.stop_gradient = False
+        
 #         sub_weight_tensor = self.weight[self.index]
 #         self.sub_weight = self.create_parameter(
 #             shape=sub_weight_tensor.shape,
