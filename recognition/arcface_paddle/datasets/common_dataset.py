@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from paddle.io import Dataset
-from paddle.vision import transforms
 import os
 import cv2
 import random
@@ -43,12 +42,6 @@ class CommonDataset(Dataset):
         self.partial_lines = self.get_file_list(label_file)
         self.delimiter = "\t"
         self.is_bin = is_bin
-        self.transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-        ])
 
         self.num_samples = len(self.partial_lines)
 
@@ -105,9 +98,8 @@ class SyntheticDataset(Dataset):
         label = self.label_list[idx]
         img = np.random.randint(0, 255, size=(112, 112, 3), dtype=np.uint8)
         img = transform(img)
-
         img = paddle.to_tensor(img, dtype='float32')
-        label = paddle.to_tensor(label, dtype='int32')
+        label = paddle.to_tensor(np.int32(label), dtype='int32')
         return img, label
 
     def __len__(self):

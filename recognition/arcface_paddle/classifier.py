@@ -15,7 +15,7 @@
 import os
 import paddle
 import paddle.nn as nn
-from paddle.nn.functional import normalize, linear
+from paddle.nn.functional import normalize
 import pickle
 
 class LargeScaleClassifier(nn.Layer):
@@ -61,43 +61,11 @@ class LargeScaleClassifier(nn.Layer):
             self.prefix, "rank:{}_softmax_weight.pkl".format(self.rank))
         self.weight_mom_name = os.path.join(
             self.prefix, "rank:{}_softmax_weight_mom.pkl".format(self.rank))
-
-#         self.index = None
-#         self.weight: paddle.Tensor = paddle.normal(0, 0.01, (self.num_local, self.embedding_size))
-#         self.weight_mom: paddle.Tensor = paddle.zeros_like(self.weight)
-#         self.weight.stop_gradient = True
-#         self.weight_mom.stop_gradient = True
         
         self.weight = self.create_parameter(
             shape=(self.num_local, self.embedding_size),
             dtype='float32',
             default_initializer=paddle.nn.initializer.Normal(std=0.01))
-    
-    @paddle.no_grad()
-    def update(self, learning_rate):
-        """
-            $$
-            velocity = mu * velocity + gradient \\
-            if (use\_nesterov):   \\
-              param = param - (gradient + mu * velocity) * learning\_rate \\
-            else:   \\
-              param = param - learning\_rate * velocity. \\
-            $$
-        """
-        if int(self.sample_rate) != 1:
-            mu = 0.9
-            weight_decay = 2e-4
-            grad = weight_decay * self.sub_weight + self.sub_weight.grad
-            self.weight_mom *= mu
-            self.weight_mom[self.index] += grad
-            self.weight -= learning_rate * self.weight_mom
-
-    def save_params(self):
-        return
-        with open(self.weight_name, 'wb') as file:
-            pickle.dump(self.weight.numpy(), file)
-        with open(self.weight_mom_name, 'wb') as file:
-            pickle.dump(self.weight_mom.numpy(), file)
 
     def sample(self, total_label, optimizer):
         # partial fc sample process
@@ -107,16 +75,6 @@ class LargeScaleClassifier(nn.Layer):
 
         self.sub_weight = self.weight[self.index]
         self.sub_weight.stop_gradient = False
-        
-#         sub_weight_tensor = self.weight[self.index]
-#         self.sub_weight = self.create_parameter(
-#             shape=sub_weight_tensor.shape,
-#             dtype='float32',
-#             default_initializer=paddle.nn.initializer.Assign(sub_weight_tensor))
-#         self.sub_weight_mom = self.weight_mom[self.index]
-#         optimizer._accumulators['velocity'].pop(optimizer._parameter_list[-1]['params'][0].name, None)
-#         optimizer._parameter_list[-1]['params'][0] = self.sub_weight
-#         optimizer._accumulators['velocity'][self.sub_weight.name] = self.sub_weight_mom
 
         return total_label
 
@@ -139,7 +97,7 @@ class LargeScaleClassifier(nn.Layer):
 
         norm_feature = normalize(total_feature)
         norm_weight = normalize(self.sub_weight)
-        logits = linear(norm_feature, paddle.t(norm_weight))
+        logits = paddle.matmul(norm_feature, norm_weight, transpose_y=True)
 
         loss = paddle.nn.functional.margin_softmax_with_cross_entropy(
             logits,
