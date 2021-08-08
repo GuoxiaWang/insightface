@@ -37,7 +37,7 @@ class LargeScaleClassifier(nn.Layer):
                  margin2=0.5,
                  margin3=0.0,
                  scale=64.0,
-                 sample_rate=1.0,
+                 sample_ratio=1.0,
                  embedding_size=512,
                  prefix="./"):
         super(LargeScaleClassifier, self).__init__()
@@ -45,13 +45,13 @@ class LargeScaleClassifier(nn.Layer):
         self.rank: int = rank
         self.world_size: int = world_size
         self.batch_size: int = batch_size
-        self.sample_rate: float = sample_rate
+        self.sample_ratio: float = sample_ratio
         self.embedding_size: int = embedding_size
         self.prefix: str = prefix
         self.num_local: int = (num_classes + world_size - 1) // world_size
         if num_classes % world_size != 0 and rank == world_size - 1:
             self.num_local = num_classes % self.num_local
-        self.num_sample: int = int(self.sample_rate * self.num_local)
+        self.num_sample: int = int(self.sample_ratio * self.num_local)
         self.margin1 = margin1
         self.margin2 = margin2
         self.margin3 = margin3
@@ -91,7 +91,7 @@ class LargeScaleClassifier(nn.Layer):
             total_feature = feature
             total_label = label
 
-        if int(self.sample_rate) != 1:
+        if int(self.sample_ratio) != 1:
             total_label = self.sample(total_label, optimizer)
         total_label.stop_gradient = True
 

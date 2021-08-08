@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
-from paddle import nn
-
-
-class CosFace(nn.Layer):
+class CosFace(object):
     def __init__(self, m1=1.0, m2=0.0, m3=0.35, s=64.0):
         super(CosFace, self).__init__()
         self.margin1 = m1
@@ -24,7 +20,7 @@ class CosFace(nn.Layer):
         self.margin3 = m3
         self.scale = s
 
-class ArcFace(nn.Layer):
+class ArcFace(object):
     def __init__(self, m1=1.0, m2=0.5, m3=0.0, s=64.0):
         super(ArcFace, self).__init__()
         self.margin1 = m1
@@ -32,7 +28,7 @@ class ArcFace(nn.Layer):
         self.margin3 = m3
         self.scale = s
 
-class SphereFace(nn.Layer):
+class SphereFace(object):
     def __init__(self, m1=1.35, m2=0.0, m3=0.0, s=64.0):
         super(SphereFace, self).__init__()
         self.margin1 = m1

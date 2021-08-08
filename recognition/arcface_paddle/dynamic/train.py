@@ -21,13 +21,14 @@ from utils.utils_callbacks import CallBackVerification, CallBackLogging, CallBac
 from utils.utils_logging import AverageMeter, init_logging
 from paddle.nn import ClipGradByNorm
 from visualdl import LogWriter
+from ..utils import utils_argparse as parser
 import paddle
 import backbones
-import argparse
 import losses
 import time
 import os
 import sys
+
 
 RELATED_FLAGS_SETTING = {
     'FLAGS_cudnn_exhaustive_search': 1,
@@ -36,12 +37,6 @@ RELATED_FLAGS_SETTING = {
 }
 paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
-
-def print_args(args):
-    print('\n--------args----------')
-    for k in list(vars(args).keys()):
-        print('%s: %s' % (k, vars(args)[k]))
-    print('------------------------\n')
 
 def main(args):
 
@@ -97,7 +92,7 @@ def main(args):
         margin2=margin_loss_params.margin2,
         margin3=margin_loss_params.margin3,
         scale=margin_loss_params.scale,
-        sample_rate=args.sample_rate,
+        sample_ratio=args.sample_ratio,
         embedding_size=args.embedding_size,
         prefix=args.output)
     large_scale_classifier.train()
@@ -185,85 +180,5 @@ def main(args):
 
 
 if __name__ == '__main__':
-    def str2bool(v):
-        return str(v).lower() in ("true", "t", "1")
-
-    def tostrlist(v):
-        if isinstance(v, list):
-            return v
-        elif isinstance(v, str):
-            return [e.strip() for e in v.split(',')]
-
-    def tointlist(v):
-        if isinstance(v, list):
-            return v
-        elif isinstance(v, str):
-            return [int(e.strip()) for e in v.split(',')]
-    
-    parser = argparse.ArgumentParser(description='Paddle Face Training')
-
-    # Model setting
-    parser.add_argument(
-        '--network', type=str, default=cfg.network, help='backbone network')
-    parser.add_argument(
-        '--embedding_size', type=int, default=cfg.embedding_size, help='embedding size')
-    parser.add_argument(
-        '--model_parallel', type=str2bool, default=cfg.model_parallel, help='whether to use model parallel')
-    parser.add_argument(
-        '--sample_rate', type=float, default=cfg.sample_rate, help='sample rate, use partial fc sample if sample rate less than 1.0')
-    parser.add_argument(
-        '--loss', type=str, default=cfg.loss, help='loss function')
-
-    # Optimizer setting
-    parser.add_argument(
-        '--lr', type=float, default=cfg.lr, help='learning rate')
-    parser.add_argument(
-        '--lr_decay', type=float, default=cfg.lr_decay, help='learning rate decay factor')
-    parser.add_argument(
-        '--weight_decay', type=float, default=cfg.weight_decay, help='weight decay')
-    parser.add_argument(
-        '--momentum', type=float, default=cfg.momentum, help='sgd momentum')
-    parser.add_argument(
-        '--train_unit', type=str, default=cfg.train_unit, help='train unit, "step" or "epoch"')
-    parser.add_argument(
-        '--warmup_num', type=int, default=cfg.warmup_num, help='warmup num according train unit')
-    parser.add_argument(
-        '--train_num', type=int, default=cfg.train_num, help='train num according train unit')
-    parser.add_argument(
-        '--decay_boundaries', type=tointlist, default=cfg.decay_boundaries, help='piecewise decay boundaries')
-
-    # Train dataset setting
-    parser.add_argument(
-        '--dataset', type=str, default=cfg.dataset, help='train dataset name')
-    parser.add_argument(
-        '--data_dir', type=str, default=cfg.data_dir, help='train dataset directory')
-    parser.add_argument(
-        '--label_file', type=str, default=cfg.label_file, help='train label file name, each line split by "\t"')
-    parser.add_argument(
-        '--is_bin', type=str2bool, default=cfg.is_bin, help='whether the train data is bin or original image file')
-    parser.add_argument(
-        '--num_classes', type=int, default=cfg.num_classes, help='classes of train dataset')
-    parser.add_argument(
-        '--batch_size', type=int, default=cfg.batch_size, help='batch size of each rank')
-
-    # Validation dataset setting
-    parser.add_argument(
-        '--do_validation_while_train', type=str2bool, default=cfg.do_validation_while_train, help='do validation while train')
-    parser.add_argument(
-        '--validation_interval_step', type=int, default=cfg.validation_interval_step, help='validation interval step')
-    parser.add_argument(
-        '--val_targets', type=tostrlist, default=cfg.val_targets, help='val targets, list or str split by comma')
-
-    # IO setting
-    parser.add_argument(
-        '--logdir', type=str, default=cfg.logdir, help='log dir')
-    parser.add_argument(
-        '--log_interval_step', type=int, default=cfg.log_interval_step, help='log interval step')
-    parser.add_argument(
-        '--output', type=str, default=cfg.output, help='output dir')
-    parser.add_argument(
-        '--resume', type=str2bool, default=cfg.resume, help='model resuming')
-
     args = parser.parse_args()
-    print_args(args)
     main(args)
