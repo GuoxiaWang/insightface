@@ -42,6 +42,8 @@ def parse_args():
 
     # Model setting
     parser.add_argument(
+        '--is_static', type=str2bool, default=cfg.is_static, help='whether to use static mode')    
+    parser.add_argument(
         '--backbone', type=str, default=cfg.backbone, help='backbone network')
     parser.add_argument(
         '--classifier', type=str, default=cfg.classifier, help='classification network')

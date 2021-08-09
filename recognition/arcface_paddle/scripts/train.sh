@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 train_static.py \
-    --backbone FresResNet100 \
+python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
+    --is_static True \
+    --backbone FresResNet50 \
     --classifier LargeScaleClassifier \
     --embedding_size 512 \
     --model_parallel False \
@@ -26,5 +27,5 @@ python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 train_static.py \
     --label_file /wangguoxia/plsc/MS1M_v2/label.txt \
     --is_bin False \
     --log_interval_step 100 \
-    --validation_interval_step 100 \
+    --validation_interval_step 2000 \
     --fp16 True

@@ -15,6 +15,7 @@
 from easydict import EasyDict as edict
 
 config = edict()
+config.is_static = True
 config.backbone = 'FresResNet100'
 config.classifier = 'LargeScaleClassifier'
 config.embedding_size = 512
