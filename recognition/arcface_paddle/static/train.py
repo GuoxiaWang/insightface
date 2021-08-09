@@ -29,7 +29,7 @@ from .utils.io import Checkpoint
 
 from . import classifiers
 from . import backbones
-
+from .static_model import StaticModel
 
 RELATED_FLAGS_SETTING = {
     'FLAGS_cudnn_exhaustive_search': 1,
@@ -56,8 +56,6 @@ def train(args):
     init_logging(rank, args.output)
     writer = LogWriter(logdir=args.logdir)
     
-    margin_loss_params = eval("losses.{}".format(args.loss))()
-    
     if args.dataset == 'synthetic':
         trainset = SyntheticDataset(args.num_classes)
     else:
@@ -83,82 +81,54 @@ def train(args):
         print('steps_per_epoch: {}'.format(steps_per_epoch))
         print('total_steps: {}'.format(total_steps))
         print('total_epoch: {}'.format(total_epoch))
+        
+    base_lr = total_batch_size * args.lr / 512
+    lr_scheduler = paddle.optimizer.lr.LinearWarmup(
+        paddle.optimizer.lr.PiecewiseDecay(
+            boundaries=decay_steps,
+            values=[base_lr * (args.lr_decay**i) for i in range(len(decay_steps) + 1)]),
+        warmup_steps,
+        0,
+        base_lr)
 
     train_program = paddle.static.Program()
     test_program = paddle.static.Program()
     startup_program = paddle.static.Program()
-    with paddle.static.program_guard(train_program, startup_program):
-        with paddle.utils.unique_name.guard():
-            backbone = eval("backbones.{}".format(args.backbone))(num_features=args.embedding_size, is_train=True)
-            classifier = eval("classifiers.{}".format(args.classifier))(
-                feature=backbone.output_dict['feature'],
-                label=backbone.input_dict['label'],
-                rank=rank,
-                world_size=world_size,
-                batch_size=args.batch_size,
-                num_classes=args.num_classes,
-                margin1=margin_loss_params.margin1,
-                margin2=margin_loss_params.margin2,
-                margin3=margin_loss_params.margin3,
-                scale=margin_loss_params.scale,
-                sample_ratio=args.sample_ratio,
-                embedding_size=args.embedding_size)
-            
-            base_lr = total_batch_size * args.lr / 512
-            lr_scheduler = paddle.optimizer.lr.LinearWarmup(
-                paddle.optimizer.lr.PiecewiseDecay(
-                    boundaries=decay_steps,
-                    values=[base_lr * (args.lr_decay**i) for i in range(len(decay_steps) + 1)]),
-                warmup_steps,
-                0,
-                base_lr)
-
-            optimizer = paddle.optimizer.Momentum(
-                learning_rate=lr_scheduler,
-                momentum=args.momentum,
-                weight_decay=paddle.regularizer.L2Decay(args.weight_decay))
-            if args.fp16:
-                optimizer = paddle.static.amp.decorate(
-                    optimizer=optimizer,
-                    init_loss_scaling=args.init_loss_scaling,
-                    incr_every_n_steps=args.incr_every_n_steps,
-                    decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
-                    incr_ratio=args.incr_ratio,
-                    decr_ratio=args.decr_ratio,
-                    use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
-                    use_pure_fp16=args.use_pure_fp16)
-
-            if world_size > 1:
-                dist_optimizer = fleet.distributed_optimizer(optimizer)
-                dist_optimizer.minimize(classifier.output_dict['loss'])
-            else:
-                optimizer.minimize(classifier.output_dict['loss'])
-            if args.fp16:
-                optimizer = optimizer._optimizer
-                
-    if args.do_validation_while_train:
-        with paddle.static.program_guard(test_program, startup_program):
-            with paddle.utils.unique_name.guard():
-                test_backbone = eval("backbones.{}".format(args.backbone))(num_features=args.embedding_size, is_train=False)
-                if world_size > 1:
-                    embedding_list = []
-                    paddle.distributed.all_gather(embedding_list, test_backbone.output_dict['feature'])
-                    test_backbone.output_dict['feature'] = paddle.concat(embedding_list, axis=0)
+    
+    margin_loss_params = eval("losses.{}".format(args.loss))()
+    train_model = StaticModel(
+        main_program=train_program,
+        startup_program=startup_program,
+        backbone_class_name=args.backbone,
+        embedding_size=args.embedding_size,
+        classifier_class_name=args.classifier,
+        num_classes=args.num_classes,
+        sample_ratio=args.sample_ratio,
+        lr_scheduler=lr_scheduler,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay,
+        mode='train',
+        fp16=args.fp16,
+        fp16_configs={
+            'init_loss_scaling': args.init_loss_scaling,
+            'incr_every_n_steps': args.incr_every_n_steps,
+            'decr_every_n_nan_or_inf': args.decr_every_n_nan_or_inf,
+            'incr_ratio': args.incr_ratio,
+            'decr_ratio': args.decr_ratio,
+            'use_dynamic_loss_scaling': args.use_dynamic_loss_scaling,
+            'use_pure_fp16': args.use_pure_fp16            
+        },
+        margin_loss_params=margin_loss_params,
+    )
         
-                    # Before test, we broadcast bathnorm-related parameters to all
-                    # other trainers from rank 0.
-                    bn_vars = [
-                        var for var in test_program.list_vars()
-                        if 'batch_norm' in var.name and var.persistable
-                    ]
-                    block = test_program.current_block()
-                    for var in bn_vars:
-                        block._insert_op(
-                            0,
-                            type='c_broadcast',
-                            inputs={'X': var},
-                            outputs={'Out': var},
-                            attrs={'use_calc_stream': True})
+    if args.do_validation_while_train:
+        test_model = StaticModel(
+            main_program=test_program,
+            startup_program=startup_program,
+            backbone_class_name=args.backbone,
+            embedding_size=args.embedding_size,
+            mode='test',
+        )
                     
         callback_verification = CallBackVerification(
             args.validation_interval_step,
@@ -166,8 +136,8 @@ def train(args):
             world_size,
             args.batch_size,
             test_program,
-            list(test_backbone.input_dict.values()),
-            list(test_backbone.output_dict.values()),
+            list(test_model.backbone.input_dict.values()),
+            list(test_model.backbone.output_dict.values()),
             args.val_targets,
             args.data_dir
         )    
@@ -208,7 +178,7 @@ def train(args):
                 
     train_loader = paddle.io.DataLoader(
         trainset,
-        feed_list=list(backbone.input_dict.values()),
+        feed_list=list(train_model.backbone.input_dict.values()),
         places=place,
         return_list=False,
         batch_size=args.batch_size,
@@ -221,18 +191,18 @@ def train(args):
             global_step += 1
             loss_v = exe.run(train_program,
                 feed=data,
-                fetch_list=[classifier.output_dict['loss']],
+                fetch_list=[train_model.classifier.output_dict['loss']],
                 use_program_cache=True)
         
             loss_avg.update(np.array(loss_v)[0], 1)
-            lr_value = optimizer.get_lr()
+            lr_value = train_model.optimizer.get_lr()
             callback_logging(global_step, loss_avg, epoch, lr_value)
             if args.validation_interval_step:
                 callback_verification(global_step)
-            lr_scheduler.step()
+            train_model.lr_scheduler.step()
             sys.stdout.flush()
             if global_step >= total_steps:
                 break
 
-        checkpoint.save(train_program, lr_scheduler=lr_scheduler, epoch=epoch, for_train=True)
+        checkpoint.save(train_program, lr_scheduler=train_model.lr_scheduler, epoch=epoch, for_train=True)
     writer.close()

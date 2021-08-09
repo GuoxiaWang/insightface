@@ -33,7 +33,6 @@ class LargeScaleClassifier(object):
                  label,
                  rank,
                  world_size,
-                 batch_size,
                  num_classes,
                  margin1=1.0,
                  margin2=0.5,
@@ -46,7 +45,6 @@ class LargeScaleClassifier(object):
         self.num_classes: int = num_classes
         self.rank: int = rank
         self.world_size: int = world_size
-        self.batch_size: int = batch_size
         self.sample_ratio: float = sample_ratio
         self.embedding_size: int = embedding_size
         self.num_local: int = (num_classes + world_size - 1) // world_size
