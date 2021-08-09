@@ -28,4 +28,5 @@ python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --is_bin False \
     --log_interval_step 100 \
     --validation_interval_step 2000 \
-    --fp16 True
+    --fp16 True \
+    --num_workers 0

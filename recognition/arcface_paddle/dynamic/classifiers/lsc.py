@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 import paddle
 import paddle.nn as nn
@@ -30,8 +31,6 @@ class LargeScaleClassifier(nn.Layer):
     def __init__(self,
                  rank,
                  world_size,
-                 batch_size,
-                 resume,
                  num_classes,
                  margin1=1.0,
                  margin2=0.5,
@@ -39,15 +38,13 @@ class LargeScaleClassifier(nn.Layer):
                  scale=64.0,
                  sample_ratio=1.0,
                  embedding_size=512,
-                 prefix="./"):
+                 name=None):
         super(LargeScaleClassifier, self).__init__()
         self.num_classes: int = num_classes
         self.rank: int = rank
         self.world_size: int = world_size
-        self.batch_size: int = batch_size
         self.sample_ratio: float = sample_ratio
         self.embedding_size: int = embedding_size
-        self.prefix: str = prefix
         self.num_local: int = (num_classes + world_size - 1) // world_size
         if num_classes % world_size != 0 and rank == world_size - 1:
             self.num_local = num_classes % self.num_local
@@ -56,29 +53,36 @@ class LargeScaleClassifier(nn.Layer):
         self.margin2 = margin2
         self.margin3 = margin3
         self.logit_scale = scale
-
-        self.weight_name = os.path.join(
-            self.prefix, "rank:{}_softmax_weight.pkl".format(self.rank))
-        self.weight_mom_name = os.path.join(
-            self.prefix, "rank:{}_softmax_weight_mom.pkl".format(self.rank))
         
+        if name is None:
+            name = 'dist@fc@rank@%05d.w' % rank
+
+        stddev = math.sqrt(2.0 / (self.embedding_size + self.num_local))
+        param_attr = paddle.ParamAttr(
+            name=name,
+            initializer=paddle.nn.initializer.Normal(std=stddev))
+        
+        self.index = None
         self.weight = self.create_parameter(
             shape=(self.num_local, self.embedding_size),
-            dtype='float32',
-            default_initializer=paddle.nn.initializer.Normal(std=0.01))
+            attr=param_attr,
+            dtype='float32')
 
-    def sample(self, total_label, optimizer):
+    def sample(self, total_label):
         # partial fc sample process
-        with paddle.fluid.dygraph.no_grad():
-            total_label, self.index = paddle.class_center_sample(
-                total_label, self.num_local, self.num_sample)
+        if int(self.sample_ratio) < 1:
+            with paddle.fluid.dygraph.no_grad():
+                total_label, self.index = paddle.class_center_sample(
+                    total_label, self.num_local, self.num_sample)
 
-        self.sub_weight = self.weight[self.index]
-        self.sub_weight.stop_gradient = False
+            self.sub_weight = self.weight[self.index]
+            self.sub_weight.stop_gradient = False
+        else:
+            self.sub_weight = self.weight
 
         return total_label
 
-    def forward(self, feature, label, optimizer):
+    def forward(self, feature, label):
         if self.world_size > 1:
             feature_list = []
             paddle.distributed.all_gather(feature_list, feature)
@@ -91,8 +95,7 @@ class LargeScaleClassifier(nn.Layer):
             total_feature = feature
             total_label = label
 
-        if int(self.sample_ratio) != 1:
-            total_label = self.sample(total_label, optimizer)
+        total_label = self.sample(total_label)
         total_label.stop_gradient = True
 
         norm_feature = normalize(total_feature)

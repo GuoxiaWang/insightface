@@ -56,7 +56,7 @@ def train(args):
     init_logging(rank, args.output)
     writer = LogWriter(logdir=args.logdir)
     
-    if args.dataset == 'synthetic':
+    if args.use_synthetic_dataset:
         trainset = SyntheticDataset(args.num_classes)
     else:
         trainset = CommonDataset(root_dir=args.data_dir, label_file=args.label_file, is_bin=args.is_bin)
@@ -167,10 +167,9 @@ def train(args):
     global_step = 0
     loss_avg = AverageMeter()
     if args.resume:
-        ckp = checkpoint.load(program=train_program, for_train=True)
-        train_program.set_state_dict(ckp['state_dict'])
-        start_epoch = ckp['extra_info']['epoch'] + 1
-        lr_state = checkpoint['extra_info']['lr_state']
+        extra_info = checkpoint.load(program=train_program, for_train=True)
+        start_epoch = extra_info['epoch'] + 1
+        lr_state = extra_info['lr_state']
         # there last_epoch means last_step in for PiecewiseDecay
         # since we always use step style for lr_scheduler
         global_step = lr_state['last_epoch']
@@ -184,7 +183,7 @@ def train(args):
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=True,
-        num_workers=0) 
+        num_workers=args.num_workers) 
     
     for epoch in range(start_epoch, total_epoch):
         for step, data in enumerate(train_loader):
@@ -200,9 +199,10 @@ def train(args):
             if args.validation_interval_step:
                 callback_verification(global_step)
             train_model.lr_scheduler.step()
-            sys.stdout.flush()
+            
             if global_step >= total_steps:
                 break
+            sys.stdout.flush()
 
         checkpoint.save(train_program, lr_scheduler=train_model.lr_scheduler, epoch=epoch, for_train=True)
     writer.close()

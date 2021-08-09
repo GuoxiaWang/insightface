@@ -41,6 +41,7 @@ config.warmup_num = 1000
 config.train_num = 180000
 config.decay_boundaries = [100000, 140000, 160000]
 
+config.use_synthetic_dataset = False
 config.dataset = "emore"
 config.data_dir = "./MS1M_bin"
 config.label_file = "./MS1M_binlabel.txt"

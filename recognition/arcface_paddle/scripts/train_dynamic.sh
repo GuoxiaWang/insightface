@@ -11,19 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
-import os
-sys.path.insert(0, os.path.abspath('.'))
 
-import paddle
-from configs import argparser as parser
-
-if __name__ == '__main__':
-    args = parser.parse_args()
-    if args.is_static:
-        from static.train import train
-        paddle.enable_static()
-    else:
-        from dynamic.train import train
-        
-    train(args)   
+python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
+    --is_static False \
+    --backbone FresResNet50 \
+    --classifier LargeScaleClassifier \
+    --embedding_size 512 \
+    --model_parallel False \
+    --sample_ratio 0.1 \
+    --loss ArcFace \
+    --batch_size 64 \
+    --dataset emore \
+    --num_classes 85742 \
+    --data_dir /wangguoxia/plsc/MS1M_v2/ \
+    --label_file /wangguoxia/plsc/MS1M_v2/label.txt \
+    --is_bin False \
+    --log_interval_step 100 \
+    --validation_interval_step 2000 \
+    --fp16 True \
+    --num_workers 0

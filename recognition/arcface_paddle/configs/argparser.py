@@ -99,6 +99,9 @@ def parse_args():
 
     # Train dataset setting
     parser.add_argument(
+        '--use_synthetic_dataset', type=str2bool, default=cfg.use_synthetic_dataset,
+        help='whether to use synthetic dataset')
+    parser.add_argument(
         '--dataset', type=str, default=cfg.dataset, help='train dataset name')
     parser.add_argument(
         '--data_dir', type=str, default=cfg.data_dir, help='train dataset directory')
