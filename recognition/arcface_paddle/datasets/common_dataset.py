@@ -83,9 +83,6 @@ class CommonDataset(paddle.io.Dataset):
         
         img = img.astype('float32')
         label = np.int32(label)
-        if paddle.fluid.framework.in_dygraph_mode():
-            img = paddle.to_tensor(img, dtype='float32')
-            label = paddle.to_tensor(label, dtype='int32')
 
         return img, label
 
@@ -106,9 +103,6 @@ class SyntheticDataset(paddle.io.Dataset):
         
         img = img.astype('float32')
         label = np.int32(label)
-        if paddle.fluid.framework.in_dygraph_mode():
-            img = paddle.to_tensor(img, dtype='float32')
-            label = paddle.to_tensor(label, dtype='int32')
 
         return img, label
 
