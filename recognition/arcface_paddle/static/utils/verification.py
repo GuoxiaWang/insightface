@@ -138,7 +138,6 @@ class CallBackVerification(object):
             program=self.test_program)
             
     def ver_test(self, global_step: int):
-        results = []
         for i in range(len(self.ver_list)):
             test_start = time.time()
             acc2, std2, xnorm = test(
@@ -154,7 +153,6 @@ class CallBackVerification(object):
                 self.ver_name_list[i], global_step, self.highest_acc_list[i]))
             test_end = time.time()
             logging.info("test time: {:.4f}".format(test_end - test_start))
-            results.append(acc2)
 
     def init_dataset(self, val_targets, data_dir, image_size):
         for name in val_targets:

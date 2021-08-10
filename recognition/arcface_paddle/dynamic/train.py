@@ -108,11 +108,12 @@ def train(args):
     classifier.train()
         
     optimizer = paddle.optimizer.Momentum(
-        parameters=[{
-            'params': backbone.parameters(),
-        }, {
-            'params': classifier.parameters(),
-        }],
+#         parameters=[{
+#             'params': backbone.parameters(),
+#         }, {
+#             'params': classifier.parameters(),
+#         }],
+        parameters=backbone.parameters() + classifier.parameters(),
         learning_rate=lr_scheduler,
         momentum=args.momentum,
         weight_decay=args.weight_decay)
