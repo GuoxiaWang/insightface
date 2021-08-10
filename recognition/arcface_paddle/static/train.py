@@ -173,7 +173,7 @@ def train(args):
         # there last_epoch means last_step in for PiecewiseDecay
         # since we always use step style for lr_scheduler
         global_step = lr_state['last_epoch']
-        lr_scheduler.set_state_dict(lr_state)
+        train_model.lr_scheduler.set_state_dict(lr_state)
                 
     train_loader = paddle.io.DataLoader(
         trainset,
@@ -192,7 +192,7 @@ def train(args):
                 feed=data,
                 fetch_list=[train_model.classifier.output_dict['loss']],
                 use_program_cache=True)
-        
+
             loss_avg.update(np.array(loss_v)[0], 1)
             lr_value = train_model.optimizer.get_lr()
             callback_logging(global_step, loss_avg, epoch, lr_value)

@@ -73,6 +73,8 @@ class Checkpoint(object):
             opt_state_dict = optimizer.state_dict()
             lr_state_dict = opt_state_dict.pop('LR_Scheduler')
             for name, opt in opt_state_dict.items():
+                if '@GRAD' in name:
+                    continue
                 # for non dist opt var, we only save their at rank 0,
                 # but for dist opt var, we need to save their at all ranks.
                 if 'dist@' in name and '@rank@' in name or self.rank == 0:
@@ -94,7 +96,7 @@ class Checkpoint(object):
                 with open(config_file, 'w') as f:
                     json.dump(extra_info, f)
                     
-        logger.info("Save model to {}.".format(model_save_dir))
+        logging.info("Save model to {}.".format(model_save_dir))
         if self.rank == 0 and self.max_num_last_checkpoint > 0:
             for idx in range(-1, epoch - self.max_num_last_checkpoint + 1):
                 path = os.path.join(self.model_save_dir, str(idx))
@@ -110,8 +112,6 @@ class Checkpoint(object):
 
         assert os.path.exists(self.checkpoint_dir)
         checkpoint_dir = os.path.abspath(self.checkpoint_dir)
-
-        logger.info("Load checkpoint from '{}'. ".format(checkpoint_dir))
 
         param_state_dict = {}
         opt_state_dict = {}
@@ -156,7 +156,7 @@ class Checkpoint(object):
         if for_train:
             meta_file = os.path.join(checkpoint_dir, 'meta.json')
             if not os.path.exists(meta_file):
-                logger.error(
+                logging.error(
                     "Please make sure the checkpoint dir {} exists, and "
                     "parameters in that dir are validating.".format(
                         checkpoint_dir))
@@ -174,10 +174,10 @@ class Checkpoint(object):
             num_classes = extra_info['num_classes']
             assert num_classes == self.num_classes
 
-            logger.info("Parameters for pre-training: pretrain_world_size ({}), "
+            logging.info("Parameters for pre-training: pretrain_world_size ({}), "
                         "embedding_size ({}), and num_classes ({}).".format(
-                            pretrain_nranks, emb_dim, num_classes))
-            logger.info("Parameters for inference or fine-tuning: "
+                            pretrain_world_size, embedding_size, num_classes))
+            logging.info("Parameters for inference or fine-tuning: "
                         "world_size ({}).".format(self.world_size))
 
             rank_str = '%05d' % self.rank
@@ -207,6 +207,7 @@ class Checkpoint(object):
                     if rank_str in name:
                         opt_state_dict[name] = value
                         
+        logging.info("Load checkpoint from '{}'. ".format(checkpoint_dir))
         backbone.set_state_dict(param_state_dict)
         if classifier is not None:
             classifier.set_state_dict(dist_param_state_dict)
