@@ -187,13 +187,13 @@ def train(args):
                 features = backbone(img)
                 loss_v = classifier(features, label)
             
-            loss_v = scaler.scale(loss_v)
-            loss_v.backward()
+            scaled_loss_v = scaler.scale(loss_v)
+            scaled_loss_v.backward()
             if world_size > 1:
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())
                 
-            scaler.minimize(optimizer, loss_v)
+            scaler.minimize(optimizer, scaled_loss_v)
             optimizer.clear_grad()
 
             lr_value = optimizer.get_lr()
