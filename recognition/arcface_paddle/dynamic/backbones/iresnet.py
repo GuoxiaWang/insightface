@@ -271,18 +271,17 @@ class FresResNet(nn.Layer):
         self.fc = FC(self.fc_channels, num_features, fc_type, name='fc')
 
     def forward(self, inputs):
-        with paddle.static.amp.fp16_guard():
-            if self.data_format == "NHWC":
-                inputs = paddle.tensor.transpose(inputs, [0, 2, 3, 1])
-                inputs.stop_gradient = True
-            y = self.conv(inputs)
-            y = self.prelu(y)
-            for block in self.block_list:
-                y = block(y)
-            y = self._batch_norm(y)
-            y = paddle.reshape(y, shape=[-1, self.fc_channels])
-            y = self.fc(y)
-            return y
+        if self.data_format == "NHWC":
+            inputs = paddle.tensor.transpose(inputs, [0, 2, 3, 1])
+            inputs.stop_gradient = True
+        y = self.conv(inputs)
+        y = self.prelu(y)
+        for block in self.block_list:
+            y = block(y)
+        y = self._batch_norm(y)
+        y = paddle.reshape(y, shape=[-1, self.fc_channels])
+        y = self.fc(y)
+        return y
 
         
 def FresResNet50(**args):
