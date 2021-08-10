@@ -16,11 +16,12 @@ import time
 import os
 import sys
 import numpy as np
+import logging
 
 import paddle
 from visualdl import LogWriter
 
-from utils.logging import AverageMeter, init_logging, CallBackLogging
+from utils.logging import AverageMeter, CallBackLogging
 from datasets import CommonDataset, SyntheticDataset
 from utils import losses
 
@@ -40,9 +41,11 @@ paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
 def train(args):
 
-    world_size = int(os.getenv("PADDLE_TRAINERS_NUM", 1))
+    writer = LogWriter(logdir=args.logdir)
+    
     rank = int(os.getenv("PADDLE_TRAINER_ID", 0))
-
+    world_size = int(os.getenv("PADDLE_TRAINERS_NUM", 1))
+    
     gpu_id = int(os.getenv("FLAGS_selected_gpus", 0))
     place = paddle.CUDAPlace(gpu_id)
 
@@ -52,10 +55,6 @@ def train(args):
         strategy.without_graph_optimization = True
         fleet.init(is_collective=True, strategy=strategy)
 
-    os.makedirs(args.output, exist_ok=True)
-    init_logging(rank, args.output)
-    writer = LogWriter(logdir=args.logdir)
-    
     if args.use_synthetic_dataset:
         trainset = SyntheticDataset(args.num_classes)
     else:
@@ -76,11 +75,12 @@ def train(args):
         total_epoch = (total_steps + steps_per_epoch - 1) // steps_per_epoch
     
     if rank == 0:
-        print('total_batch_size: {}'.format(total_batch_size))
-        print('warmup_steps: {}'.format(warmup_steps))
-        print('steps_per_epoch: {}'.format(steps_per_epoch))
-        print('total_steps: {}'.format(total_steps))
-        print('total_epoch: {}'.format(total_epoch))
+        logging.info('world_size: {}'.format(world_size))
+        logging.info('total_batch_size: {}'.format(total_batch_size))
+        logging.info('warmup_steps: {}'.format(warmup_steps))
+        logging.info('steps_per_epoch: {}'.format(steps_per_epoch))
+        logging.info('total_steps: {}'.format(total_steps))
+        logging.info('total_epoch: {}'.format(total_epoch))
         
     base_lr = total_batch_size * args.lr / 512
     lr_scheduler = paddle.optimizer.lr.LinearWarmup(

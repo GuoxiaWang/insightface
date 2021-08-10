@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import argparse
 from .config import config as cfg
 
 def print_args(args):
-    print('\n--------args----------')
+    logging.info('--------args----------')
     for k in list(vars(args).keys()):
-        print('%s: %s' % (k, vars(args)[k]))
-    print('------------------------\n')
+        logging.info('%s: %s' % (k, vars(args)[k]))
+    logging.info('------------------------\n')
 
 def str2bool(v):
     return str(v).lower() in ("true", "t", "1")
@@ -139,5 +140,4 @@ def parse_args():
         '--max_num_last_checkpoint', type=int, default=cfg.max_num_last_checkpoint,
         help='the maximum number of lastest checkpoint to keep')    
     args = parser.parse_args()
-    print_args(args)
     return args

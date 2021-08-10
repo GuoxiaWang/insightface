@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.abspath('.'))
 
 import paddle
 from configs import argparser as parser
+from utils.logging import init_logging
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -26,4 +27,8 @@ if __name__ == '__main__':
     else:
         from dynamic.train import train
         
+    rank = int(os.getenv("PADDLE_TRAINER_ID", 0))
+    os.makedirs(args.output, exist_ok=True)
+    init_logging(rank, args.output)
+    parser.print_args(args)
     train(args)   
