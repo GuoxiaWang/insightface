@@ -167,18 +167,32 @@ def train(args):
         drop_last=True,
         num_workers=args.num_workers) 
     
+
+    scaler = paddle.amp.GradScaler(
+        enable=args.fp16,
+        init_loss_scaling=args.init_loss_scaling,
+        incr_ratio=args.incr_ratio,
+        decr_ratio=args.decr_ratio,
+        incr_every_n_steps=args.incr_every_n_steps,
+        decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
+        use_dynamic_loss_scaling=args.use_dynamic_loss_scaling
+    )
+        
     for epoch in range(start_epoch, total_epoch):
         for step, (img, label) in enumerate(train_loader):
             global_step += 1
             
-            features = backbone(img)
-            loss_v = classifier(features, label)
+            with paddle.amp.auto_cast(enable=args.fp16):
+                features = backbone(img)
+                loss_v = classifier(features, label)
+            
+            loss_v = scaler.scale(loss_v)
             loss_v.backward()
             if world_size > 1:
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())
                 
-            optimizer.step()
+            scaler.minimize(optimizer, loss_v)
             optimizer.clear_grad()
 
             lr_value = optimizer.get_lr()
