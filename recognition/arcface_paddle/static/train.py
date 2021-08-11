@@ -120,6 +120,9 @@ def train(args):
         },
         margin_loss_params=margin_loss_params,
     )
+    if rank == 0:
+        with open(os.path.join(args.output, 'main_program.txt'), 'w') as f:
+            f.write(str(train_program))
         
     if args.do_validation_while_train:
         test_model = StaticModel(
