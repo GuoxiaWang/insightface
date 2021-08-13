@@ -83,13 +83,15 @@ def train(args):
         logging.info('total_epoch: {}'.format(total_epoch))
         
     base_lr = total_batch_size * args.lr / 512
-    lr_scheduler = paddle.optimizer.lr.LinearWarmup(
-        paddle.optimizer.lr.PiecewiseDecay(
-            boundaries=decay_steps,
-            values=[base_lr * (args.lr_decay**i) for i in range(len(decay_steps) + 1)]),
-        warmup_steps,
-        0,
-        base_lr)
+    lr_scheduler = paddle.optimizer.lr.PiecewiseDecay(
+        boundaries=decay_steps,
+        values=[base_lr * (args.lr_decay**i) for i in range(len(decay_steps) + 1)])
+    if warmup_steps > 0:
+        lr_scheduler = paddle.optimizer.lr.LinearWarmup(
+            lr_scheduler,
+            warmup_steps,
+            0,
+            base_lr)
 
     margin_loss_params = eval("losses.{}".format(args.loss))()
     backbone = eval("backbones.{}".format(args.backbone))(num_features=args.embedding_size)
@@ -108,11 +110,12 @@ def train(args):
     classifier.train()
         
     optimizer = paddle.optimizer.Momentum(
-        parameters=[{
-            'params': backbone.parameters(),
-        }, {
-            'params': classifier.parameters(),
-        }],
+#         parameters=[{
+#             'params': backbone.parameters(),
+#         }, {
+#             'params': classifier.parameters(),
+#         }],
+        parameters=backbone.parameters() + classifier.parameters(),
         learning_rate=lr_scheduler,
         momentum=args.momentum,
         weight_decay=args.weight_decay)
@@ -186,13 +189,13 @@ def train(args):
                 features = backbone(img)
                 loss_v = classifier(features, label)
             
-            loss_v = scaler.scale(loss_v)
-            loss_v.backward()
+            scaled_loss_v = scaler.scale(loss_v)
+            scaled_loss_v.backward()
             if world_size > 1:
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())
                 
-            scaler.minimize(optimizer, loss_v)
+            scaler.minimize(optimizer, scaled_loss_v)
             optimizer.clear_grad()
 
             lr_value = optimizer.get_lr()

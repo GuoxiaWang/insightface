@@ -38,14 +38,10 @@ def test(data_set, backbone, batch_size, nfolds=10):
             bb = min(ba + batch_size, data.shape[0])
             count = bb - ba
             _data = data[bb - batch_size:bb]
-            time0 = datetime.datetime.now()
             # 将numpy转Tensor
-            img = paddle.to_tensor(img)
+            img = paddle.to_tensor(_data, dtype='float32')
             net_out: paddle.Tensor = backbone(img)
             _embeddings = net_out.detach().cpu().numpy()
-            time_now = datetime.datetime.now()
-            diff = time_now - time0
-            time_consumed += diff.total_seconds()
             if embeddings is None:
                 embeddings = np.zeros((data.shape[0], _embeddings.shape[1]))
             embeddings[ba:bb, :] = _embeddings[(batch_size - count):, :]
@@ -71,8 +67,6 @@ def test(data_set, backbone, batch_size, nfolds=10):
     std1 = 0.0
     embeddings = embeddings_list[0] + embeddings_list[1]
     embeddings = sklearn.preprocessing.normalize(embeddings)
-    print(embeddings.shape)
-    print('infer time', time_consumed)
     _, _, accuracy, val, val_std, far = evaluate(
         embeddings, issame_list, nrof_folds=nfolds)
     acc2, std2 = np.mean(accuracy), np.std(accuracy)
@@ -101,8 +95,8 @@ class CallBackVerification(object):
                  backbone: paddle.nn.Layer,
                  global_step: int,
                  batch_size: int):
-        results = []
         for i in range(len(self.ver_list)):
+            test_start = time.time()
             acc1, std1, acc2, std2, xnorm, embeddings_list = test(
                 self.ver_list[i], backbone, batch_size, 10)
             logging.info('[%s][%d]XNorm: %f' %
@@ -113,7 +107,8 @@ class CallBackVerification(object):
                 self.highest_acc_list[i] = acc2
             logging.info('[%s][%d]Accuracy-Highest: %1.5f' % (
                 self.ver_name_list[i], global_step, self.highest_acc_list[i]))
-            results.append(acc2)
+            test_end = time.time()
+            logging.info("test time: {:.4f}".format(test_end - test_start))
 
     def init_dataset(self, val_targets, data_dir, image_size):
         for name in val_targets:
