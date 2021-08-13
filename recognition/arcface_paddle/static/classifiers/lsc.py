@@ -96,7 +96,7 @@ class LargeScaleClassifier(object):
 
         if self.sample_ratio < 1.0:
             # partial fc sample process
-            total_label, sampled_class_index = paddle.class_center_sample(
+            total_label, sampled_class_index = paddle.nn.functional.class_center_sample(
                 total_label, self.num_local, self.num_sample)
             total_label.stop_gradient = True
             sampled_class_index.stop_gradient = True
@@ -106,7 +106,7 @@ class LargeScaleClassifier(object):
         norm_weight = paddle.nn.functional.normalize(weight, axis=0)
         local_logit = paddle.matmul(norm_feature, norm_weight)
 
-        loss = paddle.nn.functional.margin_softmax_with_cross_entropy(
+        loss = paddle.nn.functional.margin_cross_entropy(
             local_logit,
             total_label,
             margin1=self.margin1,

@@ -72,7 +72,7 @@ class LargeScaleClassifier(nn.Layer):
         # partial fc sample process
         if int(self.sample_ratio) < 1:
             with paddle.fluid.dygraph.no_grad():
-                total_label, self.index = paddle.class_center_sample(
+                total_label, self.index = paddle.nn.functional.class_center_sample(
                     total_label, self.num_local, self.num_sample)
 
             self.sub_weight = self.weight[self.index]
@@ -102,7 +102,7 @@ class LargeScaleClassifier(nn.Layer):
         norm_weight = normalize(self.sub_weight)
         logits = paddle.matmul(norm_feature, norm_weight, transpose_y=True)
 
-        loss = paddle.nn.functional.margin_softmax_with_cross_entropy(
+        loss = paddle.nn.functional.margin_cross_entropy(
             logits,
             total_label,
             margin1=self.margin1,
