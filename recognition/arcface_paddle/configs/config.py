@@ -42,13 +42,13 @@ config.train_num = 180000
 config.decay_boundaries = [100000, 140000, 160000]
 
 config.use_synthetic_dataset = False
-config.dataset = "emore"
-config.data_dir = "./MS1M_bin"
-config.label_file = "./MS1M_binlabel.txt"
+config.dataset = "MS1M_v3"
+config.data_dir = "./MS1M_v3_bin"
+config.label_file = "./MS1M_v3_binlabel.txt"
 config.is_bin = True
-config.num_classes = 85742
-config.batch_size = 64 # 512 for 1 GPU
-config.num_workers = 4
+config.num_classes = 85742 # 85742 for MS1M_v2, 93431 for MS1M_v3
+config.batch_size = 64 # global batch size 512 of 8 GPU
+config.num_workers = 8
 
 config.do_validation_while_train = True
 config.validation_interval_step = 2000
@@ -56,7 +56,7 @@ config.val_targets = ["lfw", "cfp_fp", "agedb_30"]
 
 config.logdir = './log'
 config.log_interval_step = 10
-config.output = './emore_arcface'
+config.output = './MS1M_v3_arcface'
 config.resume = False
 config.checkpoint_dir = None
 config.max_num_last_checkpoint = 3

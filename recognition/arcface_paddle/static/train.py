@@ -223,7 +223,8 @@ def train(args):
         margin_loss_params=margin_loss_params,
     )
     
-    gather_optimization_pass(train_program, 'dist@fc@rank')
+    if args.sample_ratio < 1.0:
+        gather_optimization_pass(train_program, 'dist@fc@rank')
     
     if rank == 0:
         with open(os.path.join(args.output, 'main_program.txt'), 'w') as f:
@@ -304,7 +305,7 @@ def train(args):
             loss_avg.update(np.array(loss_v)[0], 1)
             lr_value = train_model.optimizer.get_lr()
             callback_logging(global_step, loss_avg, epoch, lr_value)
-            if args.do_validation_while_train:
+            if rank == 0 and args.do_validation_while_train:
                 callback_verification(global_step)
             train_model.lr_scheduler.step()
             
