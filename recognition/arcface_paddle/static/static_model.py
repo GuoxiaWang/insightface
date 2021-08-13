@@ -115,25 +115,6 @@ class StaticModel(object):
                 with paddle.utils.unique_name.guard():
                     self.backbone = eval("backbones.{}".format(self.backbone_class_name))(num_features=self.embedding_size, is_train=False)
                     assert 'feature' in self.backbone.output_dict
-                    if world_size > 1:
-                        embedding_list = []
-                        paddle.distributed.all_gather(embedding_list, self.backbone.output_dict['feature'])
-                        self.backbone.output_dict['feature'] = paddle.concat(embedding_list, axis=0)
-
-                        # Before test, we broadcast bathnorm-related parameters to all
-                        # other trainers from rank 0.
-                        bn_vars = [
-                            var for var in self.main_program.list_vars()
-                            if 'batch_norm' in var.name and var.persistable
-                        ]
-                        block = self.main_program.current_block()
-                        for var in bn_vars:
-                            block._insert_op(
-                                0,
-                                type='c_broadcast',
-                                inputs={'X': var},
-                                outputs={'Out': var},
-                                attrs={'use_calc_stream': True})
                                 
         else:
             raise ValueError("mode is error, only support 'train' and 'test' now.")

@@ -83,13 +83,15 @@ def train(args):
         logging.info('total_epoch: {}'.format(total_epoch))
         
     base_lr = total_batch_size * args.lr / 512
-    lr_scheduler = paddle.optimizer.lr.LinearWarmup(
-        paddle.optimizer.lr.PiecewiseDecay(
-            boundaries=decay_steps,
-            values=[base_lr * (args.lr_decay**i) for i in range(len(decay_steps) + 1)]),
-        warmup_steps,
-        0,
-        base_lr)
+    lr_scheduler = paddle.optimizer.lr.PiecewiseDecay(
+        boundaries=decay_steps,
+        values=[base_lr * (args.lr_decay**i) for i in range(len(decay_steps) + 1)])
+    if warmup_steps > 0:
+        lr_scheduler = paddle.optimizer.lr.LinearWarmup(
+            lr_scheduler,
+            warmup_steps,
+            0,
+            base_lr)
 
     train_program = paddle.static.Program()
     test_program = paddle.static.Program()
@@ -121,7 +123,7 @@ def train(args):
         margin_loss_params=margin_loss_params,
     )
         
-    if args.do_validation_while_train:
+    if rank == 0 and args.do_validation_while_train:
         test_model = StaticModel(
             main_program=test_program,
             startup_program=startup_program,

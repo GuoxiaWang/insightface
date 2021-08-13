@@ -34,7 +34,7 @@ config.use_pure_fp16 = False
 
 config.lr = 0.1 # for global batch size = 512
 config.lr_decay = 0.1
-config.weight_decay = 2e-4
+config.weight_decay = 5e-4
 config.momentum = 0.9
 config.train_unit = 'step' # 'step' or 'epoch'
 config.warmup_num = 1000

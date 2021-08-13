@@ -31,59 +31,30 @@ def test(rank,
          data_feeder,
          fetch_list):
         
-    real_test_batch_size = batch_size * world_size
     data_list = data_set[0]
     issame_list = data_set[1]
     embeddings_list = []
     
     # data_list[0] for normalize
     # data_list[1] for flip_left_right
-    for j in range(len(data_list)):
-        data = data_list[j]
+    for i in range(len(data_list)):
+        data = data_list[i]
         embeddings = None
-        # For multi-card test, the dataset can be partitioned into two
-        # part. For the first part, the total number of samples is
-        # divisiable by the number of cards. And then, these samples
-        # are split on different cards and tested parallely. For the
-        # second part, these samples are tested on all cards but only
-        # the result of the first card is used.
-
-        # The number of steps for parallel test.
-        parallel_test_steps = data.shape[0] // real_test_batch_size
-        for idx in range(parallel_test_steps):
-            start = idx * real_test_batch_size
-            offset = rank * batch_size
-            begin = start + offset
-            end = begin + batch_size
+        ba = 0
+        while ba < data.shape[0]:
+            bb = min(ba + batch_size, data.shape[0])
+            count = bb - ba
             _data = []
-            for k in range(begin, end):
+            for k in range(bb - batch_size, bb):
                 _data.append((data[k],))
-            assert len(_data) == batch_size
             [_embeddings] = executor.run(test_program,
                                     fetch_list=fetch_list,
                                     feed=data_feeder.feed(_data),
                                     use_program_cache=True)
             if embeddings is None:
-                embeddings = np.zeros((data.shape[0],
-                                       _embeddings.shape[1]))
-            end = start + real_test_batch_size
-            embeddings[start:end, :] = _embeddings[:, :]
-        beg = parallel_test_steps * real_test_batch_size
-
-        while beg < data.shape[0]:
-            end = min(beg + batch_size, data.shape[0])
-            count = end - beg
-            _data = []
-            for k in range(end - batch_size, end):
-                _data.append((data[k],))
-            [_embeddings] = executor.run(test_program,
-                                    fetch_list=fetch_list,
-                                    feed=data_feeder.feed(_data),
-                                    use_program_cache=True)
-            _embeddings = _embeddings[0:batch_size, :]
-            embeddings[beg:end, :] = _embeddings[(batch_size
-                                                  - count):, :]
-            beg = end
+                embeddings = np.zeros((data.shape[0], _embeddings.shape[1]))
+            embeddings[ba:bb, :] = _embeddings[(batch_size - count):, :]
+            ba = bb
         embeddings_list.append(embeddings)
 
     xnorm = 0.0
@@ -138,7 +109,6 @@ class CallBackVerification(object):
             program=self.test_program)
             
     def ver_test(self, global_step: int):
-        results = []
         for i in range(len(self.ver_list)):
             test_start = time.time()
             acc2, std2, xnorm = test(
@@ -154,7 +124,6 @@ class CallBackVerification(object):
                 self.ver_name_list[i], global_step, self.highest_acc_list[i]))
             test_end = time.time()
             logging.info("test time: {:.4f}".format(test_end - test_start))
-            results.append(acc2)
 
     def init_dataset(self, val_targets, data_dir, image_size):
         for name in val_targets:
@@ -165,5 +134,5 @@ class CallBackVerification(object):
                 self.ver_name_list.append(name)
 
     def __call__(self, num_update):
-        if num_update > 0 and num_update % self.frequent == 0:
+        if self.rank == 0 and num_update > 0 and num_update % self.frequent == 0:
             self.ver_test(num_update)

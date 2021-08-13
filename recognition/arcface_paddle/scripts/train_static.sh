@@ -18,15 +18,19 @@ python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --classifier LargeScaleClassifier \
     --embedding_size 512 \
     --model_parallel False \
-    --sample_ratio 0.1 \
+    --sample_ratio 1.0 \
     --loss ArcFace \
-    --batch_size 64 \
-    --dataset emore \
-    --num_classes 85742 \
-    --data_dir /wangguoxia/plsc/MS1M_v2/ \
-    --label_file /wangguoxia/plsc/MS1M_v2/label.txt \
+    --batch_size 128 \
+    --dataset MS1M_v3 \
+    --num_classes 93431 \
+    --data_dir /wangguoxia/plsc/MS1M_v3/ \
+    --label_file /wangguoxia/plsc/MS1M_v3/label.txt \
     --is_bin False \
     --log_interval_step 100 \
     --validation_interval_step 2000 \
     --fp16 True \
-    --num_workers 0
+    --num_workers 8 \
+    --train_unit 'epoch' \
+    --warmup_num 0 \
+    --train_num 25 \
+    --decay_boundaries "10,16,22"
