@@ -46,7 +46,7 @@ config.dataset = "MS1M_v3"
 config.data_dir = "./MS1M_v3_bin"
 config.label_file = "./MS1M_v3_binlabel.txt"
 config.is_bin = True
-config.num_classes = 85742 # 85742 for MS1M_v2, 93431 for MS1M_v3
+config.num_classes = 93431 # 85742 for MS1M_v2, 93431 for MS1M_v3
 config.batch_size = 64 # global batch size 512 of 8 GPU
 config.num_workers = 8
 
