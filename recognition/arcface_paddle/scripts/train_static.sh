@@ -17,8 +17,8 @@ python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --backbone FresResNet50 \
     --classifier LargeScaleClassifier \
     --embedding_size 512 \
-    --model_parallel False \
-    --sample_ratio 1.0 \
+    --model_parallel True \
+    --sample_ratio 0.1 \
     --loss ArcFace \
     --batch_size 128 \
     --dataset MS1M_v3 \
