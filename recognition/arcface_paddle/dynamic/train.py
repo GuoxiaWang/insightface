@@ -110,12 +110,11 @@ def train(args):
     classifier.train()
         
     optimizer = paddle.optimizer.Momentum(
-#         parameters=[{
-#             'params': backbone.parameters(),
-#         }, {
-#             'params': classifier.parameters(),
-#         }],
-        parameters=backbone.parameters() + classifier.parameters(),
+        parameters=[{
+            'params': backbone.parameters(),
+        }, {
+            'params': classifier.parameters(),
+        }],
         learning_rate=lr_scheduler,
         momentum=args.momentum,
         weight_decay=args.weight_decay)
@@ -189,13 +188,12 @@ def train(args):
                 features = backbone(img)
                 loss_v = classifier(features, label)
             
-            scaled_loss_v = scaler.scale(loss_v)
-            scaled_loss_v.backward()
+            scaler.scale(loss_v).backward()
             if world_size > 1:
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())
                 
-            scaler.minimize(optimizer, scaled_loss_v)
+            scaler.step(optimizer)
             optimizer.clear_grad()
 
             lr_value = optimizer.get_lr()
