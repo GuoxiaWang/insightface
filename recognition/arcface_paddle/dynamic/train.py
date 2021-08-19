@@ -61,8 +61,8 @@ def train(args):
         trainset = CommonDataset(root_dir=args.data_dir, label_file=args.label_file, is_bin=args.is_bin)
         
     num_image = len(trainset)    
-    steps_per_epoch = num_image // args.batch_size
     total_batch_size = args.batch_size * world_size
+    steps_per_epoch = num_image // total_batch_size
     if args.train_unit == 'epoch':
         warmup_steps = steps_per_epoch * args.warmup_num
         total_steps = steps_per_epoch * args.train_num
@@ -81,6 +81,7 @@ def train(args):
         logging.info('steps_per_epoch: {}'.format(steps_per_epoch))
         logging.info('total_steps: {}'.format(total_steps))
         logging.info('total_epoch: {}'.format(total_epoch))
+        logging.info('decay_steps: {}'.format(decay_steps))
         
     base_lr = total_batch_size * args.lr / 512
     lr_scheduler = paddle.optimizer.lr.PiecewiseDecay(
@@ -164,11 +165,14 @@ def train(args):
     train_loader = paddle.io.DataLoader(
         trainset,
         places=place,
-        batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=True,
-        num_workers=args.num_workers) 
-    
+        num_workers=args.num_workers,
+        batch_sampler=paddle.io.DistributedBatchSampler(
+            dataset=trainset,
+            batch_size=args.batch_size,
+            shuffle=True,
+            drop_last=True
+        )
+    )    
 
     scaler = paddle.amp.GradScaler(
         enable=args.fp16,
