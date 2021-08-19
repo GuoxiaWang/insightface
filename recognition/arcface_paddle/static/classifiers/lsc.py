@@ -94,11 +94,12 @@ class LargeScaleClassifier(object):
             total_feature = feature
             total_label = label
 
+        total_label.stop_gradient = True
+        
         if self.sample_ratio < 1.0:
             # partial fc sample process
             total_label, sampled_class_index = paddle.nn.functional.class_center_sample(
                 total_label, self.num_local, self.num_sample)
-            total_label.stop_gradient = True
             sampled_class_index.stop_gradient = True
             weight = paddle.gather(weight, sampled_class_index, axis=1)
      

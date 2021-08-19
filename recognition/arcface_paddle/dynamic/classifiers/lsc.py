@@ -16,8 +16,6 @@ import math
 import os
 import paddle
 import paddle.nn as nn
-from paddle.nn.functional import normalize
-import pickle
 
 class LargeScaleClassifier(nn.Layer):
     """
@@ -54,6 +52,8 @@ class LargeScaleClassifier(nn.Layer):
         self.margin3 = margin3
         self.logit_scale = scale
         
+        self._parameter_list = []
+        
         if name is None:
             name = 'dist@fc@rank@%05d.w' % rank
 
@@ -64,23 +64,27 @@ class LargeScaleClassifier(nn.Layer):
         
         self.index = None
         self.weight = self.create_parameter(
-            shape=(self.num_local, self.embedding_size),
+            shape=[self.embedding_size, self.num_local],
             attr=param_attr,
+            is_bias=False,
             dtype='float32')
-
-    def sample(self, total_label):
-        # partial fc sample process
+        
         if int(self.sample_ratio) < 1:
-            with paddle.fluid.dygraph.no_grad():
-                total_label, self.index = paddle.nn.functional.class_center_sample(
-                    total_label, self.num_local, self.num_sample)
-
-            self.sub_weight = self.weight[self.index]
-            self.sub_weight.stop_gradient = False
-        else:
-            self.sub_weight = self.weight
-
-        return total_label
+            self.weight.stop_gradient = True
+            
+    def step(self, optimizer):
+        if int(self.sample_ratio) < 1:
+            velocity = optimizer._accumulators['velocity'][self.weight.name]
+            _, _ = paddle._C_ops.sparse_momentum(
+                self.weight, self.sub_weight.grad, velocity, self.index,
+                optimizer._global_learning_rate(), self.weight, velocity, 
+                'mu', optimizer._momentum, 'use_nesterov',
+                optimizer._use_nesterov, 'regularization_method',
+                optimizer._regularization_method, 'regularization_coeff',
+                optimizer._regularization_coeff, 'axis', 1)
+            
+    def clear_grad(self):
+        self._parameter_list = []
 
     def forward(self, feature, label):
         if self.world_size > 1:
@@ -91,19 +95,29 @@ class LargeScaleClassifier(nn.Layer):
             label_list = []
             paddle.distributed.all_gather(label_list, label)
             total_label = paddle.concat(label_list, axis=0)
+            total_label.stop_gradient = True
         else:
             total_feature = feature
             total_label = label
-
-        total_label = self.sample(total_label)
-        total_label.stop_gradient = True
-
-        norm_feature = normalize(total_feature)
-        norm_weight = normalize(self.sub_weight)
-        logits = paddle.matmul(norm_feature, norm_weight, transpose_y=True)
+            
+        if self.sample_ratio < 1.0:
+            # partial fc sample process
+            total_label, self.index = paddle.nn.functional.class_center_sample(
+                total_label, self.num_local, self.num_sample)
+            total_label.stop_gradient = True
+            self.index.stop_gradient = True
+            self.sub_weight = paddle.gather(self.weight, self.index, axis=1)
+            self.sub_weight.stop_gradient = False
+            self._parameter_list.append(self.sub_weight)
+        else:
+            self.sub_weight = self.weight
+     
+        norm_feature = paddle.nn.functional.normalize(total_feature, axis=1)
+        norm_weight = paddle.nn.functional.normalize(self.sub_weight, axis=0)
+        local_logit = paddle.matmul(norm_feature, norm_weight)
 
         loss = paddle.nn.functional.margin_cross_entropy(
-            logits,
+            local_logit,
             total_label,
             margin1=self.margin1,
             margin2=self.margin2,

@@ -27,6 +27,7 @@ from utils import losses
 
 from .utils.verification import CallBackVerification
 from .utils.io import Checkpoint
+from .utils.amp import LSCGradScaler
 
 from . import classifiers
 from . import backbones
@@ -174,7 +175,7 @@ def train(args):
         )
     )    
 
-    scaler = paddle.amp.GradScaler(
+    scaler = LSCGradScaler(
         enable=args.fp16,
         init_loss_scaling=args.init_loss_scaling,
         incr_ratio=args.incr_ratio,
@@ -197,13 +198,14 @@ def train(args):
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())
                 
-            scaler.step(optimizer)
+            scaler.step(optimizer, classifier)
             optimizer.clear_grad()
+            classifier.clear_grad()
 
             lr_value = optimizer.get_lr()
             loss_avg.update(loss_v, 1)
             callback_logging(global_step, loss_avg, epoch, lr_value)
-            if args.validation_interval_step:
+            if args.do_validation_while_train:
                 callback_verification(global_step, backbone)
             lr_scheduler.step()
             
