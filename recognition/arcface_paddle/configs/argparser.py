@@ -57,6 +57,8 @@ def parse_args():
         help='sample rate, use partial fc sample if sample rate less than 1.0')
     parser.add_argument(
         '--loss', type=str, default=cfg.loss, help='loss function')
+    parser.add_argument(
+        '--dropout', type=float, default=cfg.dropout, help='probability of dropout')
         
     # AMP setting
     parser.add_argument(

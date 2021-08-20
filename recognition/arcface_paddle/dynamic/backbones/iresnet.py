@@ -59,7 +59,7 @@ class ConvBNLayer(nn.Layer):
         self._batch_norm = BatchNorm(
             num_filters,
             act=act,
-            epsilon=2e-5,
+            epsilon=1e-05,
             param_attr=ParamAttr(name=bn_name + "_scale"),
             bias_attr=ParamAttr(bn_name + "_offset"),
             moving_mean_name=bn_name + "_mean",
@@ -85,7 +85,7 @@ class BasicBlock(nn.Layer):
         self._batch_norm = BatchNorm(
             num_channels,
             act=None,
-            epsilon=2e-5,
+            epsilon=1e-05,
             param_attr=ParamAttr(name=bn_name + "_scale"),
             bias_attr=ParamAttr(bn_name + "_offset"),
             moving_mean_name=bn_name + "_mean",
@@ -100,7 +100,7 @@ class BasicBlock(nn.Layer):
             act=None,
             name=name + "_branch2a",
             data_format=data_format)
-        self.prelu = PReLU(num_parameters=num_filters, init=0.25, name=name + "_branch2a_prelu")
+        self.prelu = PReLU(num_parameters=num_filters, name=name + "_branch2a_prelu")
         self.conv1 = ConvBNLayer(
             num_channels=num_filters,
             num_filters=num_filters,
@@ -140,6 +140,7 @@ class FC(nn.Layer):
                  num_channels,
                  num_classes,
                  fc_type,
+                 dropout=0.4,
                  name=None,
                  data_format="NCHW"):
         super(FC, self).__init__()
@@ -147,10 +148,10 @@ class FC(nn.Layer):
         
         bn_name = "bn_" + name
         if fc_type == "Z":
-            self.dropout = Dropout(p=0.4, name=name + '_dropout')
+            self.dropout = Dropout(p=dropout, name=name + '_dropout')
             
         elif fc_type == "E":
-            self.dropout = Dropout(p=0.4, name=name + '_dropout')
+            self.dropout = Dropout(p=dropout, name=name + '_dropout')
             stdv = 1.0 / math.sqrt(num_channels * 1.0)
             self.fc = Linear(
                 num_channels,
@@ -161,7 +162,7 @@ class FC(nn.Layer):
             self._batch_norm_1 = BatchNorm(
                 num_classes,
                 act=None,
-                epsilon=2e-5,
+                epsilon=1e-05,
                 param_attr=ParamAttr(name=bn_name + "_1_scale"),
                 bias_attr=ParamAttr(bn_name + "_1_offset"),
                 moving_mean_name=bn_name + "_1_mean",
@@ -179,7 +180,7 @@ class FC(nn.Layer):
             self._batch_norm_1 = BatchNorm(
                 num_classes,
                 act=None,
-                epsilon=2e-5,
+                epsilon=1e-05,
                 param_attr=ParamAttr(name=bn_name + "_1_scale"),
                 bias_attr=ParamAttr(bn_name + "_1_offset"),
                 moving_mean_name=bn_name + "_1_mean",
@@ -202,7 +203,7 @@ class FC(nn.Layer):
         return fc1
     
 class FresResNet(nn.Layer):
-    def __init__(self, layers=50, num_features=512, fc_type='E',
+    def __init__(self, layers=50, num_features=512, fc_type='E', dropout=0.4,
                  input_image_channel=3, input_image_width=112,
                  input_image_height=112, data_format="NCHW"):
         
@@ -233,7 +234,7 @@ class FresResNet(nn.Layer):
             act=None,
             name="conv1",
             data_format=self.data_format)
-        self.prelu = PReLU(num_parameters=64, init=0.25, name="prelu1")
+        self.prelu = PReLU(num_parameters=64, name="prelu1")
         
         self.block_list = []
         for block in range(len(units)):
@@ -256,7 +257,7 @@ class FresResNet(nn.Layer):
         self._batch_norm = BatchNorm(
             num_filters[-1],
             act=None,
-            epsilon=2e-5,
+            epsilon=1e-05,
             param_attr=ParamAttr(name="bn_scale"),
             bias_attr=ParamAttr("bn_offset"),
             moving_mean_name="bn_mean",
@@ -268,7 +269,7 @@ class FresResNet(nn.Layer):
         feat_w = input_image_width // 16
         feat_h = input_image_height // 16
         self.fc_channels = num_filters[-1] * feat_w * feat_h
-        self.fc = FC(self.fc_channels, num_features, fc_type, name='fc')
+        self.fc = FC(self.fc_channels, num_features, fc_type, dropout, name='fc')
 
     def forward(self, inputs):
         if self.data_format == "NHWC":

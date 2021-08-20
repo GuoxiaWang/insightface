@@ -96,7 +96,9 @@ def train(args):
             base_lr)
 
     margin_loss_params = eval("losses.{}".format(args.loss))()
-    backbone = eval("backbones.{}".format(args.backbone))(num_features=args.embedding_size)
+    backbone = eval("backbones.{}".format(args.backbone))(
+        num_features=args.embedding_size,
+        dropout=args.dropout)
     classifier = eval("classifiers.{}".format(args.classifier))(
         rank=rank,
         world_size=world_size,
