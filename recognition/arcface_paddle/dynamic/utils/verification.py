@@ -77,11 +77,13 @@ class CallBackVerification(object):
     def __init__(self,
                  frequent,
                  rank,
+                 batch_size,
                  val_targets,
                  rec_prefix,
                  image_size=(112, 112)):
         self.frequent: int = frequent
         self.rank: int = rank
+        self.batch_size: int = batch_size
         self.highest_acc_list: List[float] = [0.0] * len(val_targets)
         self.ver_list: List[object] = []
         self.ver_name_list: List[str] = []
@@ -93,12 +95,11 @@ class CallBackVerification(object):
 
     def ver_test(self,
                  backbone: paddle.nn.Layer,
-                 global_step: int,
-                 batch_size: int):
+                 global_step: int):
         for i in range(len(self.ver_list)):
             test_start = time.time()
             acc1, std1, acc2, std2, xnorm, embeddings_list = test(
-                self.ver_list[i], backbone, batch_size, 10)
+                self.ver_list[i], backbone, self.batch_size, 10)
             logging.info('[%s][%d]XNorm: %f' %
                          (self.ver_name_list[i], global_step, xnorm))
             logging.info('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' %
@@ -118,10 +119,10 @@ class CallBackVerification(object):
                 self.ver_list.append(data_set)
                 self.ver_name_list.append(name)
 
-    def __call__(self, num_update, backbone: paddle.nn.Layer, batch_size=64):
+    def __call__(self, num_update, backbone: paddle.nn.Layer):
         if self.rank == 0 and num_update > 0 and num_update % self.frequent == 0:
             backbone.eval()
-            self.ver_test(backbone, num_update, batch_size)
+            self.ver_test(backbone, num_update)
             backbone.train()
 
 

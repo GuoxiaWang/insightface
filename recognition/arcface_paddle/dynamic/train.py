@@ -130,6 +130,7 @@ def train(args):
         callback_verification = CallBackVerification(
             args.validation_interval_step,
             rank,
+            args.batch_size,
             args.val_targets,
             args.data_dir
         )

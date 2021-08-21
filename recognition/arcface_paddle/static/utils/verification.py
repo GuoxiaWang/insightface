@@ -23,7 +23,6 @@ from utils.verification import evaluate
 from datasets import load_bin
 
 def test(rank,
-         world_size,
          batch_size,
          data_set,
          executor,
@@ -75,7 +74,6 @@ class CallBackVerification(object):
     def __init__(self,
                  frequent,
                  rank,
-                 world_size,
                  batch_size,
                  test_program,
                  feed_list,
@@ -85,7 +83,6 @@ class CallBackVerification(object):
                  image_size=(112, 112)):
         self.frequent: int = frequent
         self.rank: int = rank
-        self.world_size: int = world_size
         self.batch_size: int = batch_size
 
         self.test_program: paddle.static.Program = test_program
@@ -112,8 +109,8 @@ class CallBackVerification(object):
         for i in range(len(self.ver_list)):
             test_start = time.time()
             acc2, std2, xnorm = test(
-                self.rank, self.world_size, self.batch_size, self.ver_list[i],
-                self.executor, self.test_program, self.data_feeder, self.fetch_list)
+                self.rank, self.batch_size, self.ver_list[i], self.executor,
+                self.test_program, self.data_feeder, self.fetch_list)
             logging.info('[%s][%d]XNorm: %f' %
                          (self.ver_name_list[i], global_step, xnorm))
             logging.info('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' %

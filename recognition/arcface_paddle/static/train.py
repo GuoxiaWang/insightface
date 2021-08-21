@@ -243,7 +243,6 @@ def train(args):
         callback_verification = CallBackVerification(
             args.validation_interval_step,
             rank,
-            world_size,
             args.batch_size,
             test_program,
             list(test_model.backbone.input_dict.values()),
