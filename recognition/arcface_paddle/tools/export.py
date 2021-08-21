@@ -22,11 +22,13 @@ def str2bool(v):
     return str(v).lower() in ("true", "t", "1")
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Paddle Face Inference')
+    parser = argparse.ArgumentParser(description='Paddle Face Exporter')
 
     # Model setting
     parser.add_argument(
         '--is_static', type=str2bool, default='False', help='whether to use static mode')    
+    parser.add_argument(
+        '--export_type', type=str, default='paddle', help='export type, paddle or onnx')
     parser.add_argument(
         '--backbone', type=str, default='FresResNet50', help='backbone network')
     parser.add_argument(
@@ -34,7 +36,7 @@ def parse_args():
     parser.add_argument(
         '--checkpoint_dir', type=str, default='MS1M_v3_arcface/FresResNet50/24/', help='checkpoint direcotry')
     parser.add_argument(
-        '--img_path', type=str, default='', help='test image path')
+        '--output_dir', type=str, default='MS1M_v3_arcface/FresResNet50/exported_model', help='export output direcotry')
 
     args = parser.parse_args()
     return args
@@ -42,9 +44,11 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     if args.is_static:
-        from static.inference import inference
+        import paddle
         paddle.enable_static()
+        from static.export import export
     else:
-        from dynamic.inference import inference
-        
-    inference(args)   
+        from dynamic.export import export
+
+    assert args.export_type in ['paddle', 'onnx']
+    export(args)
