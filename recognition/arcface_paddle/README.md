@@ -135,7 +135,6 @@ We also support export to onnx model, you only need to set `--export_type onnx`.
 | Dynamic |  MS1MV3  | r50      | 0.1   |             |             |         |        |      |      |
 | Dynamic |  MS1MV3  | r50      | 1.0   |             |             |         |        |      |      |
 
-
 **Configuration：**
   * GPU: 8 NVIDIA Tesla V100 32G
   * Precison: AMP
@@ -145,11 +144,16 @@ We also support export to onnx model, you only need to set `--export_type onnx`.
 
 | Mode                      | Res50                        | Res100                       |
 | ------------------------- | ---------------------------- | ---------------------------- |
-| Oneflow                   | 42000000 (31792MiB/32510MiB) | 39000000 (31938MiB/32510MiB) |
-| PyTorch                   | 30000000 (31702MiB/32510MiB) | 29000000 (32286MiB/32510MiB) |
-| Paddle (static)           | 42000000 (31916MiB/32510MiB) | 39000000 (31916MiB/32510MiB) |
-| Paddle (dynamic)          | 41500000 (32008MiB/32510MiB) | 38000000 (32020MiB/32510MiB) |
+| Oneflow                   |                              |                              |
+| PyTorch                   |                              |                              |
+| Paddle (static)           |                              |                              |
+| Paddle (dynamic)          |                              |                              |
 
+**Configuration：**
+  * GPU: 8 NVIDIA Tesla V100 32G
+  * Precison: AMP
+  * BatchSize: 64/512
+  * SampleRatio: 0.1
 
 ## 8. Model inference
 
