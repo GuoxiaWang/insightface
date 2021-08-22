@@ -123,10 +123,17 @@ sh scripts/export_dynamic.sh
 
 We also support export to onnx model, you only need to set `--export_type onnx`.
 
+## 7. Model inference
 
-## 7. Model performance
+The model inference process supports paddle save inference model and onnx model.
 
-### 7.1 Performance on IJB-C and Verification Datasets
+```bash
+sh scripts/inference.sh
+```
+
+## 8. Model performance
+
+### 8.1 Performance on IJB-C and Verification Datasets
 
 | Mode    | Datasets | backbone | Ratio | IJBC(1e-05) | IJBC(1e-04) | agedb30 | cfp_fp | lfw  | log  |
 | ------- | :------: | :------- | ----- | :---------- | :---------- | :------ | :----- | :--- | :--- |
@@ -140,7 +147,7 @@ We also support export to onnx model, you only need to set `--export_type onnx`.
   * Precison: AMP
   * BatchSize: 128/1024
   
-### 7.2 Maximum Number of Identities 
+### 8.2 Maximum Number of Identities 
 
 | Mode                      | Res50                        | Res100                       |
 | ------------------------- | ---------------------------- | ---------------------------- |
@@ -155,7 +162,7 @@ We also support export to onnx model, you only need to set `--export_type onnx`.
   * BatchSize: 64/512
   * SampleRatio: 0.1
 
-## 8. Model inference
+## 9. Demo
 
 Combined with face detection model, we can complete the face recognition process.
 
