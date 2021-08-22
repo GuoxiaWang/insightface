@@ -44,8 +44,8 @@ config.decay_boundaries = [100000, 140000, 160000]
 
 config.use_synthetic_dataset = False
 config.dataset = "MS1M_v3"
-config.data_dir = "./MS1M_v3_bin"
-config.label_file = "./MS1M_v3_binlabel.txt"
+config.data_dir = "./MS1M_v3"
+config.label_file = "./MS1M_v3/label.txt"
 config.is_bin = True
 config.num_classes = 93431 # 85742 for MS1M_v2, 93431 for MS1M_v3
 config.batch_size = 64 # global batch size 512 of 8 GPU
