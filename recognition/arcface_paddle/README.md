@@ -45,14 +45,14 @@ arcface_paddle/MS1M_v3
 |_ lfw.bin
 ```
 
-* Label file format is as follows.
+Label file format is as follows.
 
-  ```
-   # delimiter: "\t"
-   # the following the content of label.txt
-   images/00000001.jpg 0
-   ...
-  ```
+```
+# delimiter: "\t"
+# the following the content of label.txt
+images/00000001.jpg 0
+...
+```
 
 If you want to use customed dataset, you can arrange your data according to the above format. 
 
@@ -135,6 +135,11 @@ sh scripts/inference.sh
 
 ### 8.1 Performance on IJB-C and Verification Datasets
 
+**Configuration：**
+  * GPU: 8 NVIDIA Tesla V100 32G
+  * Precison: AMP
+  * BatchSize: 128/1024
+
 | Mode    | Datasets | backbone | Ratio | IJBC(1e-05) | IJBC(1e-04) | agedb30 | cfp_fp | lfw  | log  |
 | ------- | :------: | :------- | ----- | :---------- | :---------- | :------ | :----- | :--- | :--- |
 | Static  |  MS1MV3  | r50      | 0.1   |             |             |         |        |      |      |
@@ -142,12 +147,14 @@ sh scripts/inference.sh
 | Dynamic |  MS1MV3  | r50      | 0.1   |             |             |         |        |      |      |
 | Dynamic |  MS1MV3  | r50      | 1.0   |             |             |         |        |      |      |
 
+  
+### 8.2 Maximum Number of Identities 
+
 **Configuration：**
   * GPU: 8 NVIDIA Tesla V100 32G
   * Precison: AMP
-  * BatchSize: 128/1024
-  
-### 8.2 Maximum Number of Identities 
+  * BatchSize: 64/512
+  * SampleRatio: 0.1
 
 | Mode                      | Res50                        | Res100                       |
 | ------------------------- | ---------------------------- | ---------------------------- |
@@ -156,11 +163,6 @@ sh scripts/inference.sh
 | Paddle (static)           |                              |                              |
 | Paddle (dynamic)          |                              |                              |
 
-**Configuration：**
-  * GPU: 8 NVIDIA Tesla V100 32G
-  * Precison: AMP
-  * BatchSize: 64/512
-  * SampleRatio: 0.1
 
 ## 9. Demo
 
