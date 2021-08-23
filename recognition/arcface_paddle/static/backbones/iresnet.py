@@ -19,7 +19,7 @@ __all__ = ["FresResNet", "FresResNet50", "FresResNet100", "FresResNet101", "Fres
 
 
 class FresResNet(object):
-    def __init__(self, layers=50, num_features=512, is_train=True, fc_type='E'):
+    def __init__(self, layers=50, num_features=512, is_train=True, fc_type='E', dropout=0.4):
         super(FresResNet, self).__init__()
         self.layers = layers
         self.num_features = num_features
@@ -64,7 +64,7 @@ class FresResNet(object):
         input_blob = paddle.static.nn.batch_norm(
             input=input_blob,
             act=None,
-            epsilon=2e-05,
+            epsilon=1e-05,
             momentum=0.9,
             is_test=False if is_train else True)
         input_blob = paddle.static.nn.prelu(
@@ -94,7 +94,7 @@ class FresResNet(object):
         bn1 = paddle.static.nn.batch_norm(
             input=in_data,
             act=None,
-            epsilon=2e-05,
+            epsilon=1e-05,
             momentum=0.9,
             is_test=False if is_train else True)
         conv1 = paddle.static.nn.conv2d(
@@ -110,7 +110,7 @@ class FresResNet(object):
         bn2 = paddle.static.nn.batch_norm(
             input=conv1,
             act=None,
-            epsilon=2e-05,
+            epsilon=1e-05,
             momentum=0.9,
             is_test=False if is_train else True)
         prelu = paddle.static.nn.prelu(
@@ -131,7 +131,7 @@ class FresResNet(object):
         bn3 = paddle.static.nn.batch_norm(
             input=conv2,
             act=None,
-            epsilon=2e-05,
+            epsilon=1e-05,
             momentum=0.9,
             is_test=False if is_train else True)
 
@@ -152,32 +152,32 @@ class FresResNet(object):
             input_blob = paddle.static.nn.batch_norm(
                 input=input_blob,
                 act=None,
-                epsilon=2e-05,
+                epsilon=1e-05,
                 momentum=0.9,
                 is_test=False if is_train else True)        
 
         identity = paddle.add(bn3, input_blob)
         return identity
     
-    def get_fc1(self, last_conv, is_train):
+    def get_fc1(self, last_conv, is_train, dropout=0.4):
         body = last_conv
         if self.fc_type == "Z":
             body = paddle.static.nn.batch_norm(
                 input=body,
                 act=None,
-                epsilon=2e-05,
+                epsilon=1e-05,
                 is_test=False if is_train else True)
             body = paddle.nn.functional.dropout(
-                x=body, p=0.4, training=is_train, mode='upscale_in_train')
+                x=body, p=dropout, training=is_train, mode='upscale_in_train')
             fc1 = body
         elif self.fc_type == "E":
             body = paddle.static.nn.batch_norm(
                 input=body,
                 act=None,
-                epsilon=2e-05,
+                epsilon=1e-05,
                 is_test=False if is_train else True)
             body = paddle.nn.functional.dropout(
-                x=body, p=0.4, training=is_train, mode='upscale_in_train')
+                x=body, p=dropout, training=is_train, mode='upscale_in_train')
             fc1 = paddle.static.nn.fc(
                 x=body,
                 size=self.num_features,
@@ -188,14 +188,14 @@ class FresResNet(object):
             fc1 = paddle.static.nn.batch_norm(
                 input=fc1,
                 act=None,
-                epsilon=2e-05,
+                epsilon=1e-05,
                 is_test=False if is_train else True)
 
         elif self.fc_type == "FC":
             body = paddle.static.nn.batch_norm(
                 input=body,
                 act=None,
-                epsilon=2e-05,
+                epsilon=1e-05,
                 is_test=False if is_train else True)
             fc1 = paddle.static.nn.fc(
                 x=body,
@@ -207,7 +207,7 @@ class FresResNet(object):
             fc1 = paddle.static.nn.batch_norm(
                 input=fc1,
                 act=None,
-                epsilon=2e-05,
+                epsilon=1e-05,
                 is_test=False if is_train else True)
             
         return fc1

@@ -22,7 +22,7 @@ config.embedding_size = 512
 config.model_parallel = True
 config.sample_ratio = 0.1
 config.loss = 'ArcFace'
-config.dropout = 0.2
+config.dropout = 0.0
 
 config.fp16 = True
 config.init_loss_scaling = 1.0

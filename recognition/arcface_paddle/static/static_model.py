@@ -23,6 +23,8 @@ from visualdl import LogWriter
 from utils.logging import AverageMeter, init_logging, CallBackLogging
 from utils import losses
 
+from .utils.optimization_pass import gather_optimization_pass
+
 from . import classifiers
 from . import backbones
 
@@ -38,6 +40,7 @@ class StaticModel(object):
                  lr_scheduler=None,
                  momentum=0.9,
                  weight_decay=2e-4,
+                 dropout=0.4,
                  mode='train',
                  fp16=False,
                  fp16_configs=None,
@@ -70,7 +73,11 @@ class StaticModel(object):
             assert self.margin_loss_params is not None
             with paddle.static.program_guard(self.main_program, self.startup_program):
                 with paddle.utils.unique_name.guard():
-                    self.backbone = eval("backbones.{}".format(self.backbone_class_name))(num_features=self.embedding_size, is_train=True)
+                    self.backbone = eval("backbones.{}".format(self.backbone_class_name))(
+                        num_features=self.embedding_size,
+                        is_train=True,
+                        dropout=dropout
+                    )
                     assert 'label' in self.backbone.input_dict
                     assert 'feature' in self.backbone.output_dict
                     self.classifier = eval("classifiers.{}".format(self.classifier_class_name))(
@@ -110,10 +117,17 @@ class StaticModel(object):
                         self.optimizer.minimize(self.classifier.output_dict['loss'])
                     if self.fp16:
                         self.optimizer = self.optimizer._optimizer
+                    if args.sample_ratio < 1.0:
+                        gather_optimization_pass(train_program, 'dist@fc@rank')
+                        
         elif self.mode == 'test':
             with paddle.static.program_guard(self.main_program, self.startup_program):
                 with paddle.utils.unique_name.guard():
-                    self.backbone = eval("backbones.{}".format(self.backbone_class_name))(num_features=self.embedding_size, is_train=False)
+                    self.backbone = eval("backbones.{}".format(self.backbone_class_name))(
+                        num_features=self.embedding_size,
+                        is_train=False,
+                        dropout=dropout
+                    )
                     assert 'feature' in self.backbone.output_dict
                                 
         else:
