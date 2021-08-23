@@ -117,8 +117,8 @@ class StaticModel(object):
                         self.optimizer.minimize(self.classifier.output_dict['loss'])
                     if self.fp16:
                         self.optimizer = self.optimizer._optimizer
-                    if args.sample_ratio < 1.0:
-                        gather_optimization_pass(train_program, 'dist@fc@rank')
+                    if self.sample_ratio < 1.0:
+                        gather_optimization_pass(self.main_program, 'dist@fc@rank')
                         
         elif self.mode == 'test':
             with paddle.static.program_guard(self.main_program, self.startup_program):
