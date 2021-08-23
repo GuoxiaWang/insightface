@@ -13,11 +13,13 @@
 # limitations under the License.
 
 python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
+    --config_file configs/ms1mv3_r50.py \
     --is_static True \
     --backbone FresResNet50 \
     --classifier LargeScaleClassifier \
     --embedding_size 512 \
     --model_parallel True \
+    --dropout 0.0 \
     --sample_ratio 0.1 \
     --loss ArcFace \
     --batch_size 128 \

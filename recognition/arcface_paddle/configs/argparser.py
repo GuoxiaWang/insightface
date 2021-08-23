@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import logging
 import argparse
-from .config import config as cfg
+import importlib
 
 def print_args(args):
     logging.info('--------args----------')
@@ -36,10 +37,31 @@ def tointlist(v):
         return v
     elif isinstance(v, str):
         return [int(e.strip()) for e in v.split(',')]
+    
+def get_config(config_file):
+    assert config_file.startswith('configs/'), 'config file setting must start with configs/'
+    temp_config_name = os.path.basename(config_file)
+    temp_module_name = os.path.splitext(temp_config_name)[0]
+    config = importlib.import_module("configs.config")
+    cfg = config.config
+    config = importlib.import_module("configs.%s" % temp_module_name)
+    job_cfg = config.config
+    cfg.update(job_cfg)
+    if cfg.output is None:
+        cfg.output = osp.join('work_dirs', temp_module_name)
+    return cfg
+
+class UserNamespace(object):
+    pass
 
 def parse_args():
     
     parser = argparse.ArgumentParser(description='Paddle Face Training')
+    user_namespace = UserNamespace()
+    parser.add_argument(
+        '--config_file', type=str, required=True, help='config file path')
+    parser.parse_known_args(namespace=user_namespace)
+    cfg = get_config(user_namespace.config_file)
 
     # Model setting
     parser.add_argument(
@@ -140,6 +162,7 @@ def parse_args():
         '--checkpoint_dir', type=str, default=cfg.checkpoint_dir, help='checkpoint direcotry')
     parser.add_argument(
         '--max_num_last_checkpoint', type=int, default=cfg.max_num_last_checkpoint,
-        help='the maximum number of lastest checkpoint to keep')    
-    args = parser.parse_args()
+        help='the maximum number of lastest checkpoint to keep') 
+
+    args = parser.parse_args(namespace=user_namespace)
     return args
