@@ -38,11 +38,12 @@ class LSCGradScaler(GradScaler):
         #  unscale the grad
         self._unscale(optimizer)
         
-        if not self._found_inf and classifier is not None:
+        if not self._found_inf and classifier is not None and len(classifier._parameter_list) > 0:
             param_grads = [
                 param._grad_ivar() for param in classifier._parameter_list
                 if param._grad_ivar() is not None
             ]
+
             _C_ops.check_finite_and_unscale(
                 param_grads,
                 self._scale,
