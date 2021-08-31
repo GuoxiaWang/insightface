@@ -78,7 +78,7 @@ class SyntheticDataset(paddle.io.Dataset):
     def __init__(self, num_classes):
         super(SyntheticDataset, self).__init__()
         self.num_classes = num_classes
-        self.label_list = np.random.randint(0, num_classes, (100000,), dtype=np.int32)
+        self.label_list = np.random.randint(0, num_classes, (5179510,), dtype=np.int32)
         self.num_samples = len(self.label_list)
 
     def __getitem__(self, idx):
