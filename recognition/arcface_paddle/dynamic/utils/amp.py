@@ -32,7 +32,7 @@ class LSCGradScaler(GradScaler):
     def step(self, optimizer, classifier=None):
         if not self._enable:
             if classifier is not None:
-                classifier.step()
+                classifier.step(optimizer)
             return optimizer.step()
 
         #  unscale the grad

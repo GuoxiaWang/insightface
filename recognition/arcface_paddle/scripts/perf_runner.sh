@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
+set -ex
 
 gpus=${1:-0,1,2,3,4,5,6,7}
 config_file=${2:-configs/ms1mv3_r50.py}
@@ -36,9 +36,15 @@ else
     fp16=False
 fi
 
+if [[ $config_file =~ r50 ]]; then
+    backbone=r50
+else
+    backbone=r100
+fi
+
 gpu_num_per_node=`expr ${#gpus} / 2 + 1`
 
-log_dir=./logs/arcface_paddle_${mode}_${dtype}_r${sample_ratio}_bz${batch_size_per_device}_${num_nodes}n${gpu_num_per_node}g_id${test_id}
+log_dir=./logs/arcface_paddle_${backbone}_${mode}_${dtype}_r${sample_ratio}_bz${batch_size_per_device}_${num_nodes}n${gpu_num_per_node}g_id${test_id}
 
 python -m paddle.distributed.launch --gpus=${gpus} --log_dir=${log_dir} tools/train.py \
     --config_file ${config_file} \
