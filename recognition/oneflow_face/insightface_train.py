@@ -10,7 +10,7 @@ import validation_util
 from callback_util import TrainMetric
 from insightface_val import Validator, get_val_args
 
-from symbols import fresnet100, fmobilefacenet
+from symbols import fresnet50, fresnet100, fmobilefacenet
 
 
 def str2list(x):
@@ -408,7 +408,8 @@ def main(args):
         raise ValueError("Invalid data format")
     flow.env.log_dir(args.log_dir)
     train_func = make_train_func(args)
-    validator = Validator(args)
+    if args.do_validation_while_train:
+        validator = Validator(args)
     if os.path.exists(args.model_load_dir):
         print("Loading model from {}".format(args.model_load_dir))
         variables = flow.checkpoint.get(args.model_load_dir)
