@@ -206,7 +206,7 @@ def train(args):
             classifier.clear_grad()
 
             lr_value = optimizer.get_lr()
-            loss_avg.update(loss_v, 1)
+            loss_avg.update(loss_v.item(), 1)
             callback_logging(global_step, loss_avg, epoch, lr_value)
             if args.do_validation_while_train:
                 callback_verification(global_step, backbone)
