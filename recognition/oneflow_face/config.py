@@ -19,7 +19,7 @@ config.enable_fuse_add_to_output = False
 network = edict()
 
 network.r50 = edict()
-network.r50.net_name = 'fresnet100'
+network.r50.net_name = 'fresnet50'
 network.r50.emb_size = 512
 network.r50.fc_type = "E"
 
