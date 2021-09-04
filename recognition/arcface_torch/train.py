@@ -96,7 +96,7 @@ def main(args):
 
     val_target = cfg.val_targets
     callback_verification = CallBackVerification(2000, rank, val_target, cfg.rec)
-    callback_logging = CallBackLogging(50, rank, cfg.total_step, cfg.batch_size, world_size, None)
+    callback_logging = CallBackLogging(1, rank, cfg.total_step, cfg.batch_size, world_size, None)
     callback_checkpoint = CallBackModelCheckpoint(rank, cfg.output)
 
     loss = AverageMeter()
@@ -129,6 +129,11 @@ def main(args):
             callback_verification(global_step, backbone)
             scheduler_backbone.step()
             scheduler_pfc.step()
+            
+            if global_step > 200:
+                with open('/tmp/done.txt', 'w') as f:
+                    pass
+                break
         callback_checkpoint(global_step, backbone, module_partial_fc)
     dist.destroy_process_group()
 
