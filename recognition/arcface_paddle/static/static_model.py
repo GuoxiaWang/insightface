@@ -111,9 +111,10 @@ class StaticModel(object):
                             use_dynamic_loss_scaling=self.fp16_configs['use_dynamic_loss_scaling'],
                             use_pure_fp16=self.fp16_configs['use_pure_fp16'],
                             amp_lists=paddle.static.amp.AutoMixedPrecisionLists(
-                                custom_white_list=[],
-                                custom_black_list=["margin_cross_entropy"],
-                            )
+                                custom_white_list=self.fp16_configs['custom_white_list'],
+                                custom_black_list=self.fp16_configs['custom_black_list'],
+                            ),
+                            use_fp16_guard=False
                         )
 
                     if world_size > 1:

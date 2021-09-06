@@ -76,9 +76,10 @@ class CommonDataset(paddle.io.Dataset):
         return self.num_samples
 
 class SyntheticDataset(paddle.io.Dataset):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, fp16=False):
         super(SyntheticDataset, self).__init__()
         self.num_classes = num_classes
+        self.fp16 = fp16
         self.label_list = np.random.randint(0, num_classes, (5179510,), dtype=np.int32)
         self.num_samples = len(self.label_list)
 
@@ -87,7 +88,7 @@ class SyntheticDataset(paddle.io.Dataset):
         img = np.random.randint(0, 255, size=(112, 112, 3), dtype=np.uint8)
         img = transform(img)
         
-        img = img.astype('float32')
+        img = img.astype('float16' if self.fp16 else 'float32')
         label = np.int32(label)
 
         return img, label

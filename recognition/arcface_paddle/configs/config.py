@@ -32,6 +32,8 @@ config.incr_ratio = 2.0
 config.decr_ratio = 0.5
 config.use_dynamic_loss_scaling = True
 config.use_pure_fp16 = False
+config.custom_white_list = []
+config.custom_black_list = ['margin_cross_entropy']
 
 config.lr = 0.1 # for global batch size = 512
 config.lr_decay = 0.1
