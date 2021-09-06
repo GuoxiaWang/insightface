@@ -58,7 +58,12 @@ def train(args):
     if args.use_synthetic_dataset:
         trainset = SyntheticDataset(args.num_classes)
     else:
-        trainset = CommonDataset(root_dir=args.data_dir, label_file=args.label_file, is_bin=args.is_bin)
+        trainset = CommonDataset(
+            root_dir=args.data_dir,
+            label_file=args.label_file,
+            fp16=args.fp16,
+            is_bin=args.is_bin
+        )
         
     num_image = len(trainset)    
     total_batch_size = args.batch_size * world_size
@@ -135,7 +140,9 @@ def train(args):
             startup_program=startup_program,
             backbone_class_name=args.backbone,
             embedding_size=args.embedding_size,
+            dropout=args.dropout,
             mode='test',
+            fp16=args.fp16,
         )
                     
         callback_verification = CallBackVerification(

@@ -76,6 +76,7 @@ class StaticModel(object):
                     self.backbone = eval("backbones.{}".format(self.backbone_class_name))(
                         num_features=self.embedding_size,
                         is_train=True,
+                        fp16=self.fp16,
                         dropout=dropout
                     )
                     assert 'label' in self.backbone.input_dict
@@ -108,7 +109,12 @@ class StaticModel(object):
                             incr_ratio=self.fp16_configs['incr_ratio'],
                             decr_ratio=self.fp16_configs['decr_ratio'],
                             use_dynamic_loss_scaling=self.fp16_configs['use_dynamic_loss_scaling'],
-                            use_pure_fp16=self.fp16_configs['use_pure_fp16'])
+                            use_pure_fp16=self.fp16_configs['use_pure_fp16'],
+                            amp_lists=paddle.static.amp.AutoMixedPrecisionLists(
+                                custom_white_list=[],
+                                custom_black_list=["margin_cross_entropy"],
+                            )
+                        )
 
                     if world_size > 1:
                         dist_optimizer = fleet.distributed_optimizer(self.optimizer)
@@ -126,6 +132,7 @@ class StaticModel(object):
                     self.backbone = eval("backbones.{}".format(self.backbone_class_name))(
                         num_features=self.embedding_size,
                         is_train=False,
+                        fp16=self.fp16,
                         dropout=dropout
                     )
                     assert 'feature' in self.backbone.output_dict

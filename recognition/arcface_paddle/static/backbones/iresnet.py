@@ -19,7 +19,7 @@ __all__ = ["FresResNet", "FresResNet50", "FresResNet100", "FresResNet101", "Fres
 
 
 class FresResNet(object):
-    def __init__(self, layers=50, num_features=512, is_train=True, fc_type='E', dropout=0.4):
+    def __init__(self, layers=50, num_features=512, is_train=True, fp16=False, fc_type='E', dropout=0.4):
         super(FresResNet, self).__init__()
         self.layers = layers
         self.num_features = num_features
@@ -27,9 +27,10 @@ class FresResNet(object):
          
         self.input_dict = OrderedDict()
         self.output_dict = OrderedDict()
-        
+
         image = paddle.static.data(
-            name='image', shape=[-1, 3, 112, 112], dtype='float32')
+            name='image', shape=[-1, 3, 112, 112],
+            dtype= 'float16' if fp16 else 'float32')
         self.input_dict['image'] = image
         if is_train:
             label = paddle.static.data(
@@ -58,8 +59,7 @@ class FresResNet(object):
             stride=1,
             padding=1,
             groups=1,
-            param_attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.XavierNormal(fan_in=0.0)),
+            param_attr=paddle.ParamAttr(),
             bias_attr=False)
         input_blob = paddle.static.nn.batch_norm(
             input=input_blob,
@@ -67,12 +67,8 @@ class FresResNet(object):
             epsilon=1e-05,
             momentum=0.9,
             is_test=False if is_train else True)
-        input_blob = paddle.static.nn.prelu(
-                input_blob,
-                mode="all",
-                param_attr=paddle.ParamAttr(
-                    initializer=paddle.nn.initializer.Constant(0.25))) 
-
+        input_blob = paddle.nn.functional.relu6(input_blob)
+    
         for i in range(num_stages):
             for j in range(units[i]):
                 input_blob = self.residual_unit_v3(
@@ -83,7 +79,7 @@ class FresResNet(object):
                     1,
                     is_train,
                 )
-        fc1 = self.get_fc1(input_blob, is_train)
+        fc1 = self.get_fc1(input_blob, is_train, dropout)
         
         self.output_dict['feature'] = fc1
     
@@ -104,8 +100,7 @@ class FresResNet(object):
             stride=1,
             padding=1,
             groups=1,
-            param_attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.XavierNormal(fan_in=0.0)),
+            param_attr=paddle.ParamAttr(),
             bias_attr=False)
         bn2 = paddle.static.nn.batch_norm(
             input=conv1,
@@ -113,11 +108,7 @@ class FresResNet(object):
             epsilon=1e-05,
             momentum=0.9,
             is_test=False if is_train else True)
-        prelu = paddle.static.nn.prelu(
-                bn2,
-                mode="all",
-                param_attr=paddle.ParamAttr(
-                    initializer=paddle.nn.initializer.Constant(0.25)))        
+        prelu = paddle.nn.functional.relu6(bn2)
         conv2 = paddle.static.nn.conv2d(
             input=prelu,
             num_filters=num_filter,
@@ -125,8 +116,7 @@ class FresResNet(object):
             stride=stride,
             padding=pad,
             groups=1,
-            param_attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.XavierNormal(fan_in=0.0)),
+            param_attr=paddle.ParamAttr(),
             bias_attr=False)
         bn3 = paddle.static.nn.batch_norm(
             input=conv2,
@@ -145,8 +135,7 @@ class FresResNet(object):
                 stride=stride,
                 padding=0,
                 groups=1,
-                param_attr=paddle.ParamAttr(
-                    initializer=paddle.nn.initializer.XavierNormal(fan_in=0.0)),
+                param_attr=paddle.ParamAttr(),
                 bias_attr=False)
             
             input_blob = paddle.static.nn.batch_norm(
@@ -167,8 +156,9 @@ class FresResNet(object):
                 act=None,
                 epsilon=1e-05,
                 is_test=False if is_train else True)
-            body = paddle.nn.functional.dropout(
-                x=body, p=dropout, training=is_train, mode='upscale_in_train')
+            if dropout > 0:
+                body = paddle.nn.functional.dropout(
+                    x=body, p=dropout, training=is_train, mode='upscale_in_train')
             fc1 = body
         elif self.fc_type == "E":
             body = paddle.static.nn.batch_norm(
@@ -176,8 +166,9 @@ class FresResNet(object):
                 act=None,
                 epsilon=1e-05,
                 is_test=False if is_train else True)
-            body = paddle.nn.functional.dropout(
-                x=body, p=dropout, training=is_train, mode='upscale_in_train')
+            if dropout > 0:
+                body = paddle.nn.functional.dropout(
+                    x=body, p=dropout, training=is_train, mode='upscale_in_train')
             fc1 = paddle.static.nn.fc(
                 x=body,
                 size=self.num_features,

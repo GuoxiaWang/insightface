@@ -39,10 +39,11 @@ def transform(img):
     return img
 
 class CommonDataset(paddle.io.Dataset):
-    def __init__(self, root_dir, label_file, is_bin=True):
+    def __init__(self, root_dir, label_file, fp16=False, is_bin=True):
         super(CommonDataset, self).__init__()
         self.root_dir = root_dir
         self.label_file = label_file
+        self.fp16 = fp16
         with open(label_file, "r") as fin:
             self.full_lines = fin.readlines()
             
@@ -66,7 +67,7 @@ class CommonDataset(paddle.io.Dataset):
 
         img = transform(img)
         
-        img = img.astype('float32')
+        img = img.astype('float16' if self.fp16 else 'float32')
         label = np.int32(label)
 
         return img, label
