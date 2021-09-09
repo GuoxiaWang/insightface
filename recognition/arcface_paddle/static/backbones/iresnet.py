@@ -67,7 +67,12 @@ class FresResNet(object):
             epsilon=1e-05,
             momentum=0.9,
             is_test=False if is_train else True)
-        input_blob = paddle.nn.functional.relu6(input_blob)
+        # input_blob = paddle.nn.functional.relu6(input_blob)
+        input_blob = paddle.static.nn.prelu(
+                input_blob,
+                mode="all",
+                param_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(0.25))) 
     
         for i in range(num_stages):
             for j in range(units[i]):
@@ -108,7 +113,12 @@ class FresResNet(object):
             epsilon=1e-05,
             momentum=0.9,
             is_test=False if is_train else True)
-        prelu = paddle.nn.functional.relu6(bn2)
+        # prelu = paddle.nn.functional.relu6(bn2)
+        prelu = paddle.static.nn.prelu(
+                bn2,
+                mode="all",
+                param_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(0.25))) 
         conv2 = paddle.static.nn.conv2d(
             input=prelu,
             num_filters=num_filter,
