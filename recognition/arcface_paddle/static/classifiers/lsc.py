@@ -69,7 +69,7 @@ class LargeScaleClassifier(object):
         param_attr = paddle.ParamAttr(
             initializer=paddle.nn.initializer.Normal(std=stddev))
         
-        weight_dtype = 'float16' if self.sample_ratio < 1.0 and feature.dtype == paddle.float16 else 'float32'
+        weight_dtype = 'float16' if feature.dtype == paddle.float16 else 'float32'
         weight = paddle.static.create_parameter(
             shape=[self.embedding_size, self.num_local],
             dtype=weight_dtype,
@@ -105,8 +105,8 @@ class LargeScaleClassifier(object):
             sampled_class_index.stop_gradient = True
             weight = paddle.gather(weight, sampled_class_index, axis=1)
     
-            if weight.dtype == paddle.float16:
-                weight = paddle.cast(weight, dtype='float32')
+        if weight.dtype == paddle.float16:
+            weight = paddle.cast(weight, dtype='float32')
 
         if total_feature.dtype == paddle.float16:
             total_feature = paddle.cast(total_feature, dtype='float32')
