@@ -79,8 +79,8 @@ class LargeScaleClassifier(nn.Layer):
             velocity = optimizer._accumulators['velocity'][self.weight.name]
             _, _ = paddle._C_ops.sparse_momentum(
                 self.weight, self._parameter_list[0].grad, velocity, self.index,
-                optimizer._global_learning_rate(), self.weight, velocity, 
-                'mu', optimizer._momentum, 'use_nesterov',
+                paddle.to_tensor(optimizer.get_lr(), dtype='float32'), self.weight,
+                velocity, 'mu', optimizer._momentum, 'use_nesterov',
                 optimizer._use_nesterov, 'regularization_method',
                 optimizer._regularization_method, 'regularization_coeff',
                 optimizer._regularization_coeff, 'axis', 1)
