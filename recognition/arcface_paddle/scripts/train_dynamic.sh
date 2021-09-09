@@ -32,7 +32,6 @@ python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --validation_interval_step 2000 \
     --fp16 True \
     --use_dynamic_loss_scaling True \
-    --use_pure_fp16 True \
     --init_loss_scaling 27648 \
     --num_workers 8 \
     --train_unit 'epoch' \

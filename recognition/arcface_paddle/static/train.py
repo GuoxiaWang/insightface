@@ -125,7 +125,7 @@ def train(args):
             'incr_ratio': args.incr_ratio,
             'decr_ratio': args.decr_ratio,
             'use_dynamic_loss_scaling': args.use_dynamic_loss_scaling,
-            'use_pure_fp16': args.use_pure_fp16,
+            'use_pure_fp16': args.fp16,
             'custom_white_list': args.custom_white_list,
             'custom_black_list': args.custom_black_list,
         },

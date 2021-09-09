@@ -31,7 +31,6 @@ config.decr_every_n_nan_or_inf = 2
 config.incr_ratio = 2.0
 config.decr_ratio = 0.5
 config.use_dynamic_loss_scaling = True
-config.use_pure_fp16 = True
 config.custom_white_list = []
 config.custom_black_list = ['margin_cross_entropy']
 

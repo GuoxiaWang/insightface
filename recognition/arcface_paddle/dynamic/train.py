@@ -100,7 +100,7 @@ def train(args):
             0,
             base_lr)
         
-    if args.use_pure_fp16:
+    if args.fp16:
         paddle.set_default_dtype("float16")
 
     margin_loss_params = eval("losses.{}".format(args.loss))()
@@ -117,7 +117,7 @@ def train(args):
         scale=margin_loss_params.scale,
         sample_ratio=args.sample_ratio,
         embedding_size=args.embedding_size,
-        # fp16=args.use_pure_fp16
+        # fp16=args.fp16
     )
     
     backbone.train()
@@ -133,7 +133,7 @@ def train(args):
         momentum=args.momentum,
         weight_decay=args.weight_decay)
     
-    if args.use_pure_fp16:
+    if args.fp16:
         optimizer._dtype = 'float32'
 
     if world_size > 1:

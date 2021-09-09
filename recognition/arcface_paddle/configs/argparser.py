@@ -102,8 +102,6 @@ def parse_args():
         '--use_dynamic_loss_scaling', type=str2bool, default=cfg.use_dynamic_loss_scaling,
         help='Whether to use dynamic loss scaling.')   
     parser.add_argument(
-        '--use_pure_fp16', type=str2bool, default=cfg.use_pure_fp16, help='Whether to use the pure fp16 training.')
-    parser.add_argument(
         '--custom_white_list', type=tostrlist, default=cfg.custom_white_list, help='fp16 custom white list.')
     parser.add_argument(
         '--custom_black_list', type=tostrlist, default=cfg.custom_black_list, help='fp16 custom black list.')
