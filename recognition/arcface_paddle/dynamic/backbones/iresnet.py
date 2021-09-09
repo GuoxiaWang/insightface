@@ -144,14 +144,17 @@ class FC(nn.Layer):
                  name=None,
                  data_format="NCHW"):
         super(FC, self).__init__()
+        self.p = dropout
         self.fc_type = fc_type
         
         bn_name = "bn_" + name
         if fc_type == "Z":
-            self.dropout = Dropout(p=dropout, name=name + '_dropout')
+            if self.p > 0:
+                self.dropout = Dropout(p=self.p, name=name + '_dropout')
             
         elif fc_type == "E":
-            self.dropout = Dropout(p=dropout, name=name + '_dropout')
+            if self.p > 0:
+                self.dropout = Dropout(p=self.p, name=name + '_dropout')
             stdv = 1.0 / math.sqrt(num_channels * 1.0)
             self.fc = Linear(
                 num_channels,
@@ -189,10 +192,16 @@ class FC(nn.Layer):
             
     def forward(self, inputs):
         if self.fc_type == "Z":
-            fc1 = self.dropout(inputs)
+            if self.p > 0:
+                fc1 = self.dropout(inputs)
+            else:
+                fc1 = inputs
             
         elif self.fc_type == "E":
-            y = self.dropout(inputs)
+            if self.p > 0:
+                y = self.dropout(inputs)
+            else:
+                y = inputs
             y = self.fc(y)
             fc1 = self._batch_norm_1(y)
             

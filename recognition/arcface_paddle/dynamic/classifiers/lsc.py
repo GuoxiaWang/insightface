@@ -36,6 +36,7 @@ class LargeScaleClassifier(nn.Layer):
                  scale=64.0,
                  sample_ratio=1.0,
                  embedding_size=512,
+                 fp16=False,
                  name=None):
         super(LargeScaleClassifier, self).__init__()
         self.num_classes: int = num_classes
@@ -43,6 +44,7 @@ class LargeScaleClassifier(nn.Layer):
         self.world_size: int = world_size
         self.sample_ratio: float = sample_ratio
         self.embedding_size: int = embedding_size
+        self.fp16 = fp16
         self.num_local: int = (num_classes + world_size - 1) // world_size
         if num_classes % world_size != 0 and rank == world_size - 1:
             self.num_local = num_classes % self.num_local
@@ -67,7 +69,7 @@ class LargeScaleClassifier(nn.Layer):
             shape=[self.embedding_size, self.num_local],
             attr=param_attr,
             is_bias=False,
-            dtype='float32')
+            dtype='float16' if self.sample_ratio < 1.0 and self.fp16 else 'float32')
         
         if int(self.sample_ratio) < 1:
             self.weight.stop_gradient = True
@@ -76,8 +78,8 @@ class LargeScaleClassifier(nn.Layer):
         if int(self.sample_ratio) < 1:
             velocity = optimizer._accumulators['velocity'][self.weight.name]
             _, _ = paddle._C_ops.sparse_momentum(
-                self.weight, self.sub_weight.grad, velocity, self.index,
-                paddle.to_tensor(optimizer.get_lr()), self.weight, velocity, 
+                self.weight, self._parameter_list[0].grad, velocity, self.index,
+                optimizer._global_learning_rate(), self.weight, velocity, 
                 'mu', optimizer._momentum, 'use_nesterov',
                 optimizer._use_nesterov, 'regularization_method',
                 optimizer._regularization_method, 'regularization_coeff',
@@ -109,8 +111,13 @@ class LargeScaleClassifier(nn.Layer):
             self.sub_weight = paddle.gather(self.weight, self.index, axis=1)
             self.sub_weight.stop_gradient = False
             self._parameter_list.append(self.sub_weight)
+            if self.sub_weight.dtype == paddle.float16:
+                self.sub_weight = paddle.cast(self.sub_weight, dtype='float32')
         else:
             self.sub_weight = self.weight
+        
+        if total_feature.dtype == paddle.float16:
+            total_feature = paddle.cast(total_feature, dtype='float32')
      
         norm_feature = paddle.nn.functional.normalize(total_feature, axis=1)
         norm_weight = paddle.nn.functional.normalize(self.sub_weight, axis=0)

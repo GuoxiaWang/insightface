@@ -31,8 +31,12 @@ python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 tools/train.py \
     --log_interval_step 100 \
     --validation_interval_step 2000 \
     --fp16 True \
+    --use_dynamic_loss_scaling True \
+    --use_pure_fp16 True \
+    --init_loss_scaling 27648 \
     --num_workers 8 \
     --train_unit 'epoch' \
     --warmup_num 0 \
     --train_num 25 \
-    --decay_boundaries "10,16,22"
+    --decay_boundaries "10,16,22" \
+    --output MS1M_v3_arcface_dynamic_0.1

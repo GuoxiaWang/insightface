@@ -24,7 +24,7 @@ from utils.verification import evaluate
 from datasets import load_bin
 
 @paddle.no_grad()
-def test(data_set, backbone, batch_size, nfolds=10):
+def test(data_set, backbone, batch_size, fp16=False, nfolds=10):
     print('testing verification..')
     data_list = data_set[0]
     issame_list = data_set[1]
@@ -39,7 +39,7 @@ def test(data_set, backbone, batch_size, nfolds=10):
             count = bb - ba
             _data = data[bb - batch_size:bb]
             # 将numpy转Tensor
-            img = paddle.to_tensor(_data, dtype='float32')
+            img = paddle.to_tensor(_data, dtype='float16' if fp16 else 'float32')
             net_out: paddle.Tensor = backbone(img)
             _embeddings = net_out.detach().cpu().numpy()
             if embeddings is None:
@@ -80,10 +80,12 @@ class CallBackVerification(object):
                  batch_size,
                  val_targets,
                  rec_prefix,
+                 fp16=False,
                  image_size=(112, 112)):
         self.frequent: int = frequent
         self.rank: int = rank
         self.batch_size: int = batch_size
+        self.fp16 = fp16
         self.highest_acc_list: List[float] = [0.0] * len(val_targets)
         self.ver_list: List[object] = []
         self.ver_name_list: List[str] = []
@@ -99,7 +101,7 @@ class CallBackVerification(object):
         for i in range(len(self.ver_list)):
             test_start = time.time()
             acc1, std1, acc2, std2, xnorm, embeddings_list = test(
-                self.ver_list[i], backbone, self.batch_size, 10)
+                self.ver_list[i], backbone, self.batch_size, fp16=self.fp16, nfolds=10)
             logging.info('[%s][%d]XNorm: %f' %
                          (self.ver_name_list[i], global_step, xnorm))
             logging.info('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' %

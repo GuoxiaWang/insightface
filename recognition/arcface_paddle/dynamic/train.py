@@ -57,9 +57,14 @@ def train(args):
         fleet.init(is_collective=True, strategy=strategy)
     
     if args.use_synthetic_dataset:
-        trainset = SyntheticDataset(args.num_classes)
+        trainset = SyntheticDataset(args.num_classes, fp16=args.fp16)
     else:
-        trainset = CommonDataset(root_dir=args.data_dir, label_file=args.label_file, is_bin=args.is_bin)
+        trainset = CommonDataset(
+            root_dir=args.data_dir,
+            label_file=args.label_file,
+            fp16=args.fp16,
+            is_bin=args.is_bin
+        )
         
     num_image = len(trainset)    
     total_batch_size = args.batch_size * world_size
@@ -94,6 +99,9 @@ def train(args):
             warmup_steps,
             0,
             base_lr)
+        
+    if args.use_pure_fp16:
+        paddle.set_default_dtype("float16")
 
     margin_loss_params = eval("losses.{}".format(args.loss))()
     backbone = eval("backbones.{}".format(args.backbone))(
@@ -108,7 +116,9 @@ def train(args):
         margin3=margin_loss_params.margin3,
         scale=margin_loss_params.scale,
         sample_ratio=args.sample_ratio,
-        embedding_size=args.embedding_size)
+        embedding_size=args.embedding_size,
+        # fp16=args.use_pure_fp16
+    )
     
     backbone.train()
     classifier.train()
@@ -122,6 +132,9 @@ def train(args):
         learning_rate=lr_scheduler,
         momentum=args.momentum,
         weight_decay=args.weight_decay)
+    
+    if args.use_pure_fp16:
+        optimizer._dtype = 'float32'
 
     if world_size > 1:
         optimizer = fleet.distributed_optimizer(optimizer)
@@ -132,7 +145,8 @@ def train(args):
             rank,
             args.batch_size,
             args.val_targets,
-            args.data_dir
+            args.data_dir,
+            fp16=args.fp16,
         )
         
     callback_logging = CallBackLogging(
@@ -194,7 +208,7 @@ def train(args):
             
             with paddle.amp.auto_cast(enable=args.fp16):
                 features = backbone(img)
-                loss_v = classifier(features, label)
+            loss_v = classifier(features, label)
             
             scaler.scale(loss_v).backward()
             if world_size > 1:

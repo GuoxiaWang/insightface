@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import defaultdict
 from paddle.amp import GradScaler
 from paddle import _C_ops
 
@@ -49,6 +50,8 @@ class LSCGradScaler(GradScaler):
                 self._scale,
                 param_grads,
                 self._found_inf)
+            if self._found_inf:
+                print('found_inf in classifier')
 
         if self._found_inf:
             self._cache_founf_inf = True
@@ -62,3 +65,29 @@ class LSCGradScaler(GradScaler):
         if self._use_dynamic_loss_scaling:
             # update the scale
             self._update()
+            
+    def _unscale(self, optimizer):
+        if not self._enable:
+            return
+
+        param_grads_dict = defaultdict(list)
+        if getattr(optimizer, '_param_groups', None) and isinstance(
+                optimizer._param_groups[0], dict):
+            for group in optimizer._param_groups:
+                for param in group['params']:
+                    if param._grad_ivar() is not None:
+                        param_grads_dict[param._grad_ivar().dtype].append(param._grad_ivar())
+        else:
+            for param in optimizer._parameter_list:
+                if param._grad_ivar() is not None:
+                    param_grads_dict[param._grad_ivar().dtype].append(param._grad_ivar())
+              
+        for dtype in param_grads_dict:
+            param_grads = param_grads_dict[dtype]
+            _C_ops.check_finite_and_unscale(param_grads, self._scale, param_grads,
+                                            self._found_inf)
+            if self._found_inf:
+                if self._found_inf:
+                    print('found_inf in backbone dtype', dtype)
+                break
+        
