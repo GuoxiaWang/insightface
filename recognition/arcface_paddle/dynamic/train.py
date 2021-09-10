@@ -117,7 +117,7 @@ def train(args):
         scale=margin_loss_params.scale,
         sample_ratio=args.sample_ratio,
         embedding_size=args.embedding_size,
-        # fp16=args.fp16
+        fp16=args.fp16
     )
     
     backbone.train()
