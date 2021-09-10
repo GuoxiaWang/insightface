@@ -124,7 +124,8 @@ class CallBackVerification(object):
     def __call__(self, num_update, backbone: paddle.nn.Layer):
         if self.rank == 0 and num_update > 0 and num_update % self.frequent == 0:
             backbone.eval()
-            self.ver_test(backbone, num_update)
+            with paddle.no_grad():
+                self.ver_test(backbone, num_update)
             backbone.train()
 
 
