@@ -36,6 +36,7 @@ RELATED_FLAGS_SETTING = {
     'FLAGS_cudnn_exhaustive_search': 1,
     'FLAGS_cudnn_batchnorm_spatial_persistent': 1,
     'FLAGS_max_inplace_grad_add': 8,
+    'FLAGS_fraction_of_gpu_memory_to_use': 0.9999,
 }
 paddle.fluid.set_flags(RELATED_FLAGS_SETTING)
 
