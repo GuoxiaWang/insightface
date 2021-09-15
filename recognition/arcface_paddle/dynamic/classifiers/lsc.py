@@ -76,14 +76,18 @@ class LargeScaleClassifier(nn.Layer):
             
     def step(self, optimizer):
         if int(self.sample_ratio) < 1:
-            velocity = optimizer._accumulators['velocity'][self.weight.name]
-            _, _ = paddle._C_ops.sparse_momentum(
-                self.weight, self._parameter_list[0].grad, velocity, self.index,
-                paddle.to_tensor(optimizer.get_lr(), dtype='float32'), self.weight,
-                velocity, 'mu', optimizer._momentum, 'use_nesterov',
-                optimizer._use_nesterov, 'regularization_method',
-                optimizer._regularization_method, 'regularization_coeff',
-                optimizer._regularization_coeff, 'axis', 1)
+            found_inf = paddle.logical_not(paddle.all(paddle.isfinite(self._parameter_list[0].grad)))
+            if found_inf:
+                print('Found inf or nan in classifier')
+            else: 
+                velocity = optimizer._accumulators['velocity'][self.weight.name]
+                _, _ = paddle._C_ops.sparse_momentum(
+                    self.weight, self._parameter_list[0].grad, velocity, self.index,
+                    paddle.to_tensor(optimizer.get_lr(), dtype='float32'), self.weight,
+                    velocity, 'mu', optimizer._momentum, 'use_nesterov',
+                    optimizer._use_nesterov, 'regularization_method',
+                    optimizer._regularization_method, 'regularization_coeff',
+                    optimizer._regularization_coeff, 'axis', 1)
             
     def clear_grad(self):
         self._parameter_list = []

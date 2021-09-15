@@ -216,7 +216,8 @@ def train(args):
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())
                 
-            scaler.step(optimizer, classifier)
+            scaler.step(optimizer)
+            classifier.step(optimizer)
             optimizer.clear_grad()
             classifier.clear_grad()
 

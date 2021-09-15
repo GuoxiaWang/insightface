@@ -15,6 +15,7 @@
 from collections import defaultdict
 from paddle.amp import GradScaler
 from paddle import _C_ops
+import paddle
 
 class LSCGradScaler(GradScaler):
     def __init__(self,
@@ -29,42 +30,6 @@ class LSCGradScaler(GradScaler):
                                      decr_ratio, incr_every_n_steps,
                                      decr_every_n_nan_or_inf,
                                      use_dynamic_loss_scaling)
-
-    def step(self, optimizer, classifier=None):
-        if not self._enable:
-            if classifier is not None:
-                classifier.step(optimizer)
-            return optimizer.step()
-
-        #  unscale the grad
-        self._unscale(optimizer)
-        
-        if not self._found_inf and classifier is not None and len(classifier._parameter_list) > 0:
-            param_grads = [
-                param._grad_ivar() for param in classifier._parameter_list
-                if param._grad_ivar() is not None
-            ]
-
-            _C_ops.check_finite_and_unscale(
-                param_grads,
-                self._scale,
-                param_grads,
-                self._found_inf)
-            if self._found_inf:
-                print('found_inf in classifier')
-
-        if self._found_inf:
-            self._cache_founf_inf = True
-        else:
-            optimizer.step()
-            if classifier is not None:
-                classifier.step(optimizer)
-                
-            self._cache_founf_inf = False
-
-        if self._use_dynamic_loss_scaling:
-            # update the scale
-            self._update()
             
     def _unscale(self, optimizer):
         if not self._enable:
@@ -88,6 +53,6 @@ class LSCGradScaler(GradScaler):
                                             self._found_inf)
             if self._found_inf:
                 if self._found_inf:
-                    print('found_inf in backbone dtype', dtype)
+                    print('Found inf or nan in backbone, dtype is', dtype)
                 break
         
