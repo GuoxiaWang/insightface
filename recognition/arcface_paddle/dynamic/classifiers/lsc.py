@@ -69,7 +69,7 @@ class LargeScaleClassifier(nn.Layer):
             shape=[self.embedding_size, self.num_local],
             attr=param_attr,
             is_bias=False,
-            dtype='float16' if self.fp16 else 'float32')
+            dtype='float16' if self.fp16 and self.sample_ratio < 1.0 else 'float32')
         
         if int(self.sample_ratio) < 1:
             self.weight.stop_gradient = True

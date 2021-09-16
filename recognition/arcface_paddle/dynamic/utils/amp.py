@@ -25,11 +25,37 @@ class LSCGradScaler(GradScaler):
              decr_ratio=0.5,
              incr_every_n_steps=1000,
              decr_every_n_nan_or_inf=2,
-             use_dynamic_loss_scaling=True):
+             use_dynamic_loss_scaling=True,
+             max_loss_scaling=32768.0):
         super(LSCGradScaler, self).__init__(enable, init_loss_scaling, incr_ratio,
                                      decr_ratio, incr_every_n_steps,
                                      decr_every_n_nan_or_inf,
                                      use_dynamic_loss_scaling)
+        self.max_loss_scaling = max_loss_scaling
+        self.init_incr_ratio = incr_ratio
+        
+    def step(self, optimizer):
+        if not self._enable:
+            return optimizer.step()
+        
+        if self._scale >= self.max_loss_scaling:
+            self._incr_ratio = 1.0
+            self._scale = paddle.to_tensor([self.max_loss_scaling], dtype='float32')
+        else:
+            self._incr_ratio = self.init_incr_ratio
+
+        #  unscale the grad
+        self._unscale(optimizer)
+
+        if self._found_inf:
+            self._cache_founf_inf = True
+        else:
+            optimizer.step()
+            self._cache_founf_inf = False
+
+        if self._use_dynamic_loss_scaling:
+            # uopdate the scale
+            self._update()
             
     def _unscale(self, optimizer):
         if not self._enable:
@@ -52,7 +78,6 @@ class LSCGradScaler(GradScaler):
             _C_ops.check_finite_and_unscale(param_grads, self._scale, param_grads,
                                             self._found_inf)
             if self._found_inf:
-                if self._found_inf:
-                    print('Found inf or nan in backbone, dtype is', dtype)
+                print('Found inf or nan in backbone, dtype is', dtype)
                 break
         
