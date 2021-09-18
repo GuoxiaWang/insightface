@@ -26,6 +26,7 @@ config.dropout = 0.0
 
 config.fp16 = True
 config.init_loss_scaling = 1.0
+config.max_loss_scaling = 4096.0
 config.incr_every_n_steps = 2000
 config.decr_every_n_nan_or_inf = 1
 config.incr_ratio = 2.0

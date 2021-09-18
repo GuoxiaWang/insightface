@@ -200,7 +200,8 @@ def train(args):
         decr_ratio=args.decr_ratio,
         incr_every_n_steps=args.incr_every_n_steps,
         decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
-        use_dynamic_loss_scaling=args.use_dynamic_loss_scaling
+        use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
+        max_loss_scaling=args.max_loss_scaling
     )
         
     for epoch in range(start_epoch, total_epoch):
