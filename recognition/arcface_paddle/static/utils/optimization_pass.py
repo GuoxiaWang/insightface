@@ -35,6 +35,7 @@ def gather_optimization_pass(program, weight_name):
             if (op.type == 'update_loss_scaling' or op.type == 'check_finite_and_unscale'):
                 input_idxs = []
                 input_arg_names = op.input("X")
+                input_arg_names.append(gather_grad_op.input('Out@GRAD')[0])
                 for i, name in enumerate(input_arg_names):
                     if '@GRAD' in name and weight_name in name:
                         input_idxs.append(i)
@@ -45,6 +46,7 @@ def gather_optimization_pass(program, weight_name):
 
                 output_idxs = []
                 output_arg_names = op.output("Out")
+                output_arg_names.append(gather_grad_op.input('Out@GRAD')[0])
                 for i, name in enumerate(output_arg_names):
                     if '@GRAD' in name and weight_name in name:
                         output_idxs.append(i)
