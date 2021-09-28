@@ -210,11 +210,6 @@ def train(args):
     for epoch in range(start_epoch, total_epoch):
         for step, data in enumerate(train_loader):
             global_step += 1
-            
-            if args.fp16:
-                loss_scale_tensor = paddle.static.global_scope().find_var("loss_scaling_0").get_tensor()
-                if np.array(loss_scale_tensor) > max_loss_scaling:
-                    loss_scale_tensor.set(max_loss_scaling, place)
                         
             loss_v = exe.run(train_program,
                 feed=data,
