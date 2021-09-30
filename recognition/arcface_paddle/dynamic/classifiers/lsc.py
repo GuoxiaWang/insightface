@@ -71,6 +71,7 @@ class LargeScaleClassifier(nn.Layer):
             attr=param_attr,
             is_bias=False,
             dtype='float16' if self.fp16 else 'float32')
+        self.weight.is_distributed = True
         
         if int(self.sample_ratio) < 1:
             self.weight.stop_gradient = True
@@ -127,9 +128,6 @@ class LargeScaleClassifier(nn.Layer):
         else:
             self.sub_weight = self.weight
 
-#         norm_feature = paddle.nn.functional.normalize(total_feature, axis=1)
-#         norm_weight = paddle.nn.functional.normalize(self.sub_weight, axis=0)
-        
         norm_feature = paddle.fluid.layers.l2_normalize(total_feature, axis=1)
         norm_weight = paddle.fluid.layers.l2_normalize(self.sub_weight, axis=0)
 
@@ -142,6 +140,10 @@ class LargeScaleClassifier(nn.Layer):
             margin2=self.margin2,
             margin3=self.margin3,
             scale=self.logit_scale,
-            return_softmax=False)
+            return_softmax=False,
+            reduction=None,
+        )
+        
+        loss = paddle.mean(loss)
         
         return loss

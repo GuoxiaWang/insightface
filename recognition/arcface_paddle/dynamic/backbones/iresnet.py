@@ -23,7 +23,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Conv2D, BatchNorm, Linear, Dropout, PReLU
 from paddle.nn import AdaptiveAvgPool2D, MaxPool2D, AvgPool2D
-from paddle.nn.initializer import Uniform
+from paddle.nn.initializer import XavierNormal, Constant
 
 import math
 
@@ -160,8 +160,8 @@ class FC(nn.Layer):
                 num_channels,
                 num_classes,
                 weight_attr=ParamAttr(
-                    initializer=Uniform(-stdv, stdv), name=name + ".w_0"),
-                bias_attr=ParamAttr(name=name + ".b_0"))
+                    initializer=XavierNormal(fan_in=0.0), name=name + ".w_0"),
+                bias_attr=ParamAttr(initializer=Constant(), name=name + ".b_0"))
             self._batch_norm_1 = BatchNorm(
                 num_classes,
                 act=None,
@@ -178,8 +178,8 @@ class FC(nn.Layer):
                 num_channels,
                 num_classes,
                 weight_attr=ParamAttr(
-                    initializer=Uniform(-stdv, stdv), name=name + ".w_0"),
-                bias_attr=ParamAttr(name=name + ".b_0"))
+                    initializer=XavierNormal(fan_in=0.0), name=name + ".w_0"),
+                bias_attr=ParamAttr(initializer=Constant(), name=name + ".b_0"))
             self._batch_norm_1 = BatchNorm(
                 num_classes,
                 act=None,

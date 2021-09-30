@@ -38,24 +38,12 @@ class LSCGradScaler(GradScaler):
             if classifier is not None:
                 classifier.step(optimizer)
             return optimizer.step()
-        
-        if self._scale >= self.max_loss_scaling:
-            self._scale = paddle.to_tensor([self.max_loss_scaling], dtype='float32')
 
+#         if self._scale >= self.max_loss_scaling:
+#             self._scale = paddle.to_tensor([self.max_loss_scaling], dtype='float32')
+            
         #  unscale the grad
         self._unscale(optimizer)
-
-        if not self._found_inf and classifier is not None and len(
-                classifier._parameter_list) > 0:
-            param_grads = [
-                param._grad_ivar() for param in classifier._parameter_list
-                if param._grad_ivar() is not None
-            ]
-
-            _C_ops.check_finite_and_unscale(param_grads, self._scale,
-                                            param_grads, self._found_inf)
-            if self._found_inf:
-                print('Found inf or nan in classifier')
 
         if self._found_inf:
             self._cache_founf_inf = True
@@ -73,19 +61,33 @@ class LSCGradScaler(GradScaler):
     def _unscale(self, optimizer):
         if not self._enable:
             return
-
+        
         param_grads_dict = defaultdict(list)
+        dist_param_grads_dict = defaultdict(list)
         if getattr(optimizer, '_param_groups', None) and isinstance(
                 optimizer._param_groups[0], dict):
             for group in optimizer._param_groups:
                 for param in group['params']:
-                    if param._grad_ivar() is not None:
-                        param_grads_dict[param._grad_ivar().dtype].append(param._grad_ivar())
+                    if not param.is_distributed:
+                        if param._grad_ivar() is not None:
+                            param_grads_dict[param._grad_ivar().dtype].append(param._grad_ivar())
+                    else:
+                        if param._grad_ivar() is not None:
+                            dist_param_grads_dict[param._grad_ivar().dtype].append(param._grad_ivar())
         else:
             for param in optimizer._parameter_list:
-                if param._grad_ivar() is not None:
-                    param_grads_dict[param._grad_ivar().dtype].append(param._grad_ivar())
-              
+                if not param.is_distributed:
+                    if param._grad_ivar() is not None:
+                        param_grads_dict[param._grad_ivar().dtype].append(param._grad_ivar())
+                else:
+                    if param._grad_ivar() is not None:
+                        dist_param_grads_dict[param._grad_ivar().dtype].append(param._grad_ivar())                        
+        for dtype in dist_param_grads_dict:
+            for grad in dist_param_grads_dict[dtype]:
+                self._found_inf = paddle.logical_not(paddle.all(paddle.isfinite(grad)))
+                if self._found_inf:
+                    return
+            
         for dtype in param_grads_dict:
             param_grads = param_grads_dict[dtype]
             _C_ops.check_finite_and_unscale(param_grads, self._scale, param_grads,

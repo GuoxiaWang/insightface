@@ -51,7 +51,7 @@ def train(args):
 
     if world_size > 1:
         import paddle.distributed.fleet as fleet
-        from .utils.data_parallel import sync_gradients
+        from .utils.data_parallel import sync_gradients, sync_params
 
         strategy = fleet.DistributedStrategy()
         strategy.without_graph_optimization = True
@@ -100,6 +100,9 @@ def train(args):
             warmup_steps,
             0,
             base_lr)
+        
+    if args.fp16:
+        paddle.set_default_dtype("float16")
 
     margin_loss_params = eval("losses.{}".format(args.loss))()
     backbone = eval("backbones.{}".format(args.backbone))(
@@ -131,23 +134,12 @@ def train(args):
         momentum=args.momentum,
         weight_decay=args.weight_decay)
     
-    scaler = LSCGradScaler(
-        enable=args.fp16,
-        init_loss_scaling=args.init_loss_scaling,
-        incr_ratio=args.incr_ratio,
-        decr_ratio=args.decr_ratio,
-        incr_every_n_steps=args.incr_every_n_steps,
-        decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
-        use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
-        max_loss_scaling=args.max_loss_scaling
-    )
-    
     if args.fp16:
-        models, optimizer = paddle.amp.decorate(models=[backbone, classifier], optimizers=optimizer, level='O2', save_dtype='float32', master_weight=False)
-        backbone, classifier = models
+        optimizer._dtype = 'float32'
 
     if world_size > 1:
-        optimizer = fleet.distributed_optimizer(optimizer)
+        # sync backbone params for data parallel
+        sync_params(backbone.parameters())
 
     if args.do_validation_while_train:
         callback_verification = CallBackVerification(
@@ -200,16 +192,23 @@ def train(args):
             shuffle=True,
             drop_last=True
         )
+    )    
+
+    scaler = LSCGradScaler(
+        enable=args.fp16,
+        init_loss_scaling=args.init_loss_scaling,
+        incr_ratio=args.incr_ratio,
+        decr_ratio=args.decr_ratio,
+        incr_every_n_steps=args.incr_every_n_steps,
+        decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
+        use_dynamic_loss_scaling=args.use_dynamic_loss_scaling
     )
         
     for epoch in range(start_epoch, total_epoch):
         for step, (img, label) in enumerate(train_loader):
             global_step += 1
-
-            with paddle.amp.auto_cast(enable=args.fp16,
-                                      custom_white_list=args.custom_white_list,
-                                      custom_black_list=args.custom_black_list,
-                                      level='O2'):
+            
+            with paddle.amp.auto_cast(enable=args.fp16):
                 features = backbone(img)
                 loss_v = classifier(features, label)
             
@@ -218,7 +217,8 @@ def train(args):
                 # data parallel sync backbone gradients
                 sync_gradients(backbone.parameters())
                 
-            scaler.step(optimizer, classifier)
+            scaler.step(optimizer)
+            classifier.step(optimizer)
             optimizer.clear_grad()
             classifier.clear_grad()
 
