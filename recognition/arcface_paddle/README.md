@@ -24,6 +24,12 @@ pip install output/opt/paddle/share/wheels/paddlepaddle_gpu-2.2.0-cp37-cp37m-lin
 
 ```
 
+### 2.2 Install Paddle from pypi
+
+```shell
+pip install paddlepaddle-gpu==2.2.0rc0
+```
+
 ## 3. Data preparation
 
 ### 3.1 Download dataset
