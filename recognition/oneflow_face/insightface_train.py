@@ -17,6 +17,8 @@ def str2list(x):
     x = [float(y) if type(eval(y)) == float else int(y) for y in x.split(',')]
     return x
 
+def ip2list(x):
+    return x.split(',')
 
 def str2bool(v):
     if v.lower() in ("yes", "true", "t", "y", "1"):
@@ -55,9 +57,14 @@ def get_train_args():
     )
     train_parser.add_argument(
         "--node_ips",
-        type=str2list,
+        type=ip2list,
         default=default.node_ips,
         help='Nodes ip list for training, devided by ",", length >= num_nodes',
+    )
+    train_parser.add_argument(
+        "--port",
+        type=int,
+        default=36671
     )
     train_parser.add_argument(
         "--model_parallel",
@@ -396,7 +403,7 @@ def main(args):
     if args.num_nodes > 1:
         assert args.num_nodes <= len(
             args.node_ips), "The number of nodes should not be greater than length of node_ips list."
-        flow.env.ctrl_port(12138)
+        flow.env.ctrl_port(args.port)
         nodes = []
         for ip in args.node_ips:
             addr_dict = {}

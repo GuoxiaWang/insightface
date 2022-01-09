@@ -37,4 +37,4 @@ mkdir -p $log_dir
 log_file=$log_dir/workerlog.0
 
     
-CUDA_VISIBLE_DEVICES=${gpus} python -m torch.distributed.launch --max_restarts 0 --nproc_per_node=${gpu_num_per_node} --nnodes=${num_nodes} --node_rank=0 --master_addr="127.0.0.1" --master_port=1234 train.py configs/ms1mv3_benchmark.py 2>&1 | tee $log_file
+CUDA_VISIBLE_DEVICES=${gpus} python -m torch.distributed.launch --max_restarts 0 --nproc_per_node=${gpu_num_per_node} --nnodes=${num_nodes} --node_rank=$PADDLE_TRAINER_ID --master_addr=${TRAINER_IP_LIST%%,*} --master_port=${TRAINER_PORTS%%,*} train.py configs/ms1mv3_benchmark.py 2>&1 | tee $log_file
